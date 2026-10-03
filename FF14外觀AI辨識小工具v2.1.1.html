@@ -610,6 +610,28 @@
       border-color: #16a085;
     }
 
+    .source-verified {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-weight: 600;
+      color: #1e8449;
+    }
+
+    .source-ai-badge {
+      font-size: 0.72rem;
+      color: #975a16;
+      background: #fefcbf;
+      border: 1px solid #fbd38d;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+      display: inline-block;
+      vertical-align: middle;
+      font-weight: normal;
+      cursor: help;
+    }
+
     /* Image Preview */
     .image-preview-card {
       border: 1px solid var(--border);
@@ -828,10 +850,10 @@
         <table>
           <thead>
             <tr>
-              <th style="width: 14%;">部位</th>
-              <th style="width: 26%;">繁中裝備名稱</th>
-              <th style="width: 40%;">取得方式</th>
-              <th style="width: 20%;">染色設定</th>
+              <th style="width: 12%;">部位</th>
+              <th style="width: 32%;">繁中裝備名稱</th>
+              <th style="width: 38%;">取得方式</th>
+              <th style="width: 18%;">染色設定</th>
             </tr>
           </thead>
           <tbody id="itemsTableBody">
@@ -1643,7 +1665,7 @@
 
 2. 【染色與取得途徑】：
    - 染色：若有標註染劑名稱或色號，請填寫（如：砲鋼黑染劑、煤玉黑染劑、或 ①色號 / ②色號；若無則填寫未染色）。
-   - 取得途徑：請填寫商城購買、副本等級掉落、NPC工票/軍票/青船幣兌換或任務獎勵等。
+   - 取得途徑：請根據裝備類型客觀填寫（如：副本掉落、無人島兌換、特職任務、生產製作、金碟遊樂場或商城購買等）。【嚴禁盲目將所有漂亮外觀猜測為商城購買】，若非100%確定請客觀填寫玩法類別或填寫「查閱灰機wiki」。
 
 3. 【穿搭注意事項】：
    - 若混用了不同生產/採集職業或戰鬥特職專屬裝備（AF裝），請在 note 中特別註明投影時的職業限制提示。
@@ -2063,6 +2085,133 @@
     let queryTerm = cleanEn ? `"${cleanEn}"` : (cleanJa ? `"${cleanJa}"` : rawZh);
     return `https://www.google.com/search?q=${encodeURIComponent('site:ff14.huijiwiki.com ' + queryTerm)}`;
   }
+  // 裝備來源智能解析引擎（方案一優先：精準特徵庫 ➔ 方案二：AI記憶 + 標註「AI判讀，詳細請點進灰機」）
+  function resolveEquipmentSource(item) {
+    const rawZh = (item.name_zh || "").trim();
+    const rawEnJp = (item.name_en_jp || "").trim();
+    const resolvedName = (item.resolved_name || "").trim();
+    const allNames = `${rawZh} ${rawEnJp} ${resolvedName}`;
+
+    // 1. 無人島開拓 (謝爾達萊青船幣兌換)
+    if (/男爵|Baronial|バロニアル|開拓者|Isle Explorer|開拓農夫|Isle Farmhand|開拓牧者|Isle Shepherd|開拓度假|Isle Vacationer|歡樂|Felicitous/i.test(allNames)) {
+      return {
+        sourceText: "無人島開拓（謝爾達萊青船幣兌換）",
+        isVerified: true
+      };
+    }
+
+    // 2. 特職專屬裝備 (AF校服 / 職業任務)
+    if (/早乙女|Saotome|明珍|Myochin|春日|Kasuga|碎月|Saigetsu|甲賀|Koga|伊賀|Iga|服部|Hattori|廷臣|Gallant|信仰|Creed|騎士|Chevalier|破壞者|Ravager|殘暴|Brutal|混沌|Chaos|深淵|Abyss|保鏢|Bodyguard|祈禱|Orison|神職|Cleric|學者|Scholar|賢學|Argute|占星|Welkin|天球|Soothsayer|哲人|Philosophist|龍騎|Drachen|飛龍|Wyrm|武僧|Temple|修道|Melee|拳士|Tantra|風魔|Fuma|亂波|Ninja|收割|Harvester|毒蛇|Viper|繪師|Pictomancer|吟遊|Choral|說書人|Storyteller|機械|Machinist|技工|Gunslinger|舞者|Dancer|第七地獄|Seventh Hell|喚魂|Summoner|召魂|Caller|決鬥|Duelist/i.test(allNames) && /袴|兜|胴|手甲|佩楯|脛当|鎖甲|外套|手套|靴|冠|長袍|外衣|頭飾|長靴|褲/i.test(allNames)) {
+      return {
+        sourceText: "特職專用裝（AF校服 / 職業任務贈送）",
+        isVerified: true
+      };
+    }
+
+    // 3. 8人大型任務 / 零式高難副本掉落 (Raid / Savage)
+    if (/伊甸|Edenmorn|Edenchoir|Edengrace|Edenpromise|エデン/i.test(allNames)) {
+      return {
+        sourceText: "伊甸希望樂園（8人大型任務 / 零式掉落）",
+        isVerified: true
+      };
+    }
+    if (/亞歷山大|Gordian|Midan|Alexandrian|アレキサンダー/i.test(allNames)) {
+      return {
+        sourceText: "亞歷山大機神城（8人大型任務 / 零式掉落）",
+        isVerified: true
+      };
+    }
+    if (/歐米茄|Deltascape|Sigmascape|Alphascape|オメガ/i.test(allNames)) {
+      return {
+        sourceText: "歐米茄時空狹縫（8人大型任務 / 零式掉落）",
+        isVerified: true
+      };
+    }
+    if (/萬魔殿|Asphodelos|Abyssos|Anabaseios|パンデモニウム/i.test(allNames)) {
+      return {
+        sourceText: "萬魔殿（8人大型任務 / 零式掉落）",
+        isVerified: true
+      };
+    }
+    if (/巴哈姆特|Allagan|High Allagan|Dreadwyrm/i.test(allNames)) {
+      return {
+        sourceText: "巴哈姆特大迷宮（8人大型任務掉落）",
+        isVerified: true
+      };
+    }
+
+    // 4. 24人團隊任務副本 (Alliance Raid)
+    if (/二號B型|2B|YoRHa|寄葉|五一式|五三式|五五式/i.test(allNames)) {
+      return {
+        sourceText: "尼爾聯動副本（寄葉部隊 24 人團隊任務掉落）",
+        isVerified: true
+      };
+    }
+    if (/阿格萊亞|欣喜神域|塔爾塔羅斯/i.test(allNames)) {
+      return {
+        sourceText: "艾歐澤亞神話（24 人團隊任務掉落）",
+        isVerified: true
+      };
+    }
+    if (/伊瓦利斯|異邦人/i.test(allNames)) {
+      return {
+        sourceText: "重返伊瓦利斯（24 人團隊任務掉落）",
+        isVerified: true
+      };
+    }
+    if (/瑪哈|亞菲姆|影之國/i.test(allNames)) {
+      return {
+        sourceText: "瑪哈之影（24 人團隊任務掉落）",
+        isVerified: true
+      };
+    }
+
+    // 5. 線上道具商城購買 (MogStation Cash Shop)
+    if (/女僕|Housemaid|メイド|管家|Butler|バトラー|東方女學生|Schoolgirl|東方學生|Schoolboy|東方美姬|東方貴公子|東方佳人|東方秀女|東方旅裝|哪吒|風雅|Fuga|魔女|天使|惡魔|學院|淑女|執事/i.test(allNames)) {
+      return {
+        sourceText: "線上道具商城購買（MogStation）",
+        isVerified: true
+      };
+    }
+
+    // 6. 金碟遊樂場 (Gold Saucer)
+    if (/兔女郎|Bunny|バニー|賭徒|Gambler|金碟/i.test(allNames)) {
+      return {
+        sourceText: "金碟遊樂場（金碟幣 MGP 兌換）",
+        isVerified: true
+      };
+    }
+
+    // 7. PvP 狼獄 / 水晶衝突
+    if (/恐狼|Direwolf|戰狼|Warwolf|共和|Republic|牙狼|GARO|地獄犬|Hellhound/i.test(allNames)) {
+      return {
+        sourceText: "PvP 狼獄水上段 / 水晶衝突（狼印 / 戰術水晶兌換）",
+        isVerified: true
+      };
+    }
+
+    // 8. 經典自製外觀 (Crafted Glamour)
+    if (/休閒夾克|Casual Jacket|街頭夾克|Street Jacket|雨衣|Raincoat|復古長衣|Rebel Coat|城市長衣|Urban Coat|花邊吊帶|Flannel|冒險者毛衣|達爾馬提卡|Dalmatica/i.test(allNames)) {
+      return {
+        sourceText: "生產製作 / 拍賣行（市場交易板購買）",
+        isVerified: true
+      };
+    }
+
+    // 9. 無精準資料時：採用 AI 記憶，並標註「（AI判讀，詳細請點進灰機）」
+    const aiSource = (item.source || "").trim();
+    if (aiSource && aiSource !== "無" && aiSource !== "未知") {
+      return {
+        sourceText: aiSource,
+        isVerified: false
+      };
+    }
+
+    return {
+      sourceText: "查閱灰機wiki",
+      isVerified: false
+    };
+  }
   // === [SECTION: JS_EQUIPMENT_RESOLVER] END ===
 
   // ==============================================================================
@@ -2078,12 +2227,34 @@
     (data.items || []).forEach(item => {
       const wikiInfo = getHuijiWikiUrl(item);
       const googleUrl = getGoogleHuijiUrl(item);
-      const displayGearName = item.name_zh; // 繁中歸繁中，絕對保留原樣！
-      const btnClass = wikiInfo.isLucky ? "wiki-btn lucky" : "wiki-btn";
 
-      // 純中文卡片不顯示多餘的「無」或空行
+      // 裝備主名稱解析：若卡片原名是日文或純英文，且大庫已成功匹配出中文名稱，優先顯示中文！
+      let displayGearName = item.name_zh || "";
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(item.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(item.name_zh || "");
+      if (item.resolved_name && isCardNonChinese) {
+        displayGearName = item.resolved_name;
+      }
+
+      // 次標題：若主標題顯示中文，次標題顯示英文/日文原名
       const hasEnJp = item.name_en_jp && item.name_en_jp !== "無" && item.name_en_jp !== "None" && item.name_en_jp.trim() !== "";
-      const subNameHtml = hasEnJp ? `<div class="sub-name">${escapeHtml(item.name_en_jp)}</div>` : "";
+      let subNameText = "";
+      if (hasEnJp) {
+        subNameText = item.name_en_jp;
+      } else if (item.resolved_name && item.resolved_name !== item.name_zh) {
+        subNameText = item.name_zh;
+      }
+      const subNameHtml = subNameText ? `<div class="sub-name">${escapeHtml(subNameText)}</div>` : "";
+
+      // 取得途徑解析（方案一優先：精準特徵庫 ➔ 方案二：AI記憶 + 標註「AI判讀，詳細請點進灰機」）
+      const sourceInfo = resolveEquipmentSource(item);
+      let sourceHtml = "";
+      if (sourceInfo.isVerified) {
+        sourceHtml = `<span class="source-verified" title="官方或特徵庫驗證途徑">🛡️ ${escapeHtml(sourceInfo.sourceText)}</span>`;
+      } else {
+        sourceHtml = `<span>${escapeHtml(sourceInfo.sourceText)}</span> <span class="source-ai-badge" title="此為視覺 AI 依記憶推測，精準取得 NPC、副本或貨幣請點選灰機 wiki 攻略">（AI判讀，詳細請點進灰機）</span>`;
+      }
+
+      const btnClass = wikiInfo.isLucky ? "wiki-btn lucky" : "wiki-btn";
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -2100,7 +2271,7 @@
           </div>
           ${subNameHtml}
         </td>
-        <td>${escapeHtml(item.source)}</td>
+        <td>${sourceHtml}</td>
         <td><span class="dye-tag">${escapeHtml(item.dye)}</span></td>
       `;
       tbody.appendChild(tr);
@@ -2123,11 +2294,15 @@
     if (!currentOutfitData) return;
     
     let lines = [];
-    lines.push(["部位", "繁中裝備名稱", "英文 / 日文名稱", "取得方式", "染色設定", "灰機wiki網址"].join("\t"));
+    lines.push(["部位", "繁中裝備名稱", "英文 / 日文原名", "取得方式", "染色設定", "灰機wiki網址"].join("\t"));
     (currentOutfitData.items || []).forEach(it => {
       const wikiInfo = getHuijiWikiUrl(it);
-      const gearName = it.resolved_name || it.name_zh;
-      lines.push([it.slot, gearName, it.name_en_jp, it.source, it.dye, wikiInfo.url].join("\t"));
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
+      const gearName = (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh);
+      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
+      const sourceInfo = resolveEquipmentSource(it);
+      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（AI判讀，詳細請點進灰機）`;
+      lines.push([it.slot, gearName, subName, finalSource, it.dye, wikiInfo.url].join("\t"));
     });
     if (currentOutfitData.note) {
       lines.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].join("\t"));
@@ -2145,12 +2320,16 @@
     if (!currentOutfitData) return;
     
     let csvRows = [];
-    csvRows.push(["部位", "繁中裝備名稱", "英文 / 日文名稱", "取得方式", "染色設定", "灰機wiki網址"].map(escapeCsv).join(","));
+    csvRows.push(["部位", "繁中裝備名稱", "英文 / 日文原名", "取得方式", "染色設定", "灰機wiki網址"].map(escapeCsv).join(","));
     
     (currentOutfitData.items || []).forEach(it => {
       const wikiInfo = getHuijiWikiUrl(it);
-      const gearName = it.resolved_name || it.name_zh;
-      csvRows.push([it.slot, gearName, it.name_en_jp, it.source, it.dye, wikiInfo.url].map(escapeCsv).join(","));
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
+      const gearName = (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh);
+      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
+      const sourceInfo = resolveEquipmentSource(it);
+      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（AI判讀，詳細請點進灰機）`;
+      csvRows.push([it.slot, gearName, subName, finalSource, it.dye, wikiInfo.url].map(escapeCsv).join(","));
     });
     
     if (currentOutfitData.note) {
@@ -2172,10 +2351,14 @@
     lines.push("=".repeat(50));
     (currentOutfitData.items || []).forEach(it => {
       const wikiInfo = getHuijiWikiUrl(it);
-      const gearName = it.resolved_name || it.name_zh;
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
+      const gearName = (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh);
+      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
+      const sourceInfo = resolveEquipmentSource(it);
+      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（AI判讀，詳細請點進灰機）`;
       lines.push(`• [${it.slot}] ${gearName}`);
-      lines.push(`  原名：${it.name_en_jp}`);
-      lines.push(`  來源：${it.source}`);
+      if (subName) lines.push(`  原名：${subName}`);
+      lines.push(`  來源：${finalSource}`);
       lines.push(`  染色：${it.dye}`);
       lines.push(`  灰機：${wikiInfo.url}`);
       lines.push("");
