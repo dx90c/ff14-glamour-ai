@@ -1,0 +1,27 @@
+# 敏感金鑰檔案（絕對不能上傳！）
+api_key.txt
+*.key
+.env
+.env.*
+
+# 本機 Excel 田地與試算表（個人資料庫保護）
+*.xlsx
+
+# 歷史舊版與測試檔（已統一整併為 v2.1.1 與 index.html）
+FF14外觀AI辨識小工具.html
+FF14外觀AI辨識小工具 (2).html
+
+# 暫存與快取目錄
+__pycache__/
+*.py[cod]
+*$py.class
+_ff14_temp_opt/
+temp/
+tmp/
+.vscode/
+.idea/
+
+# 作業系統暫存檔
+Thumbs.db
+Desktop.ini
+.DS_Store

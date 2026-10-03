@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+【FF14 幻化外觀 AI 辨識小工具 - 架構導航索引 / AI NAVIGATION MAP】
+維護或修改程式碼時，請優先定位以下標準化錨點標籤 [SECTION: ...]，避免全檔盲目檢索：
+
+1. [SECTION: CSS_STYLES]
+   - 主題色彩變數 (:root)、版面配置、卡片元件、按鈕、表格、控制台與彈窗樣式。
+2. [SECTION: HTML_DOM]
+   - 頂部導航列 (Header)、版本通知橫幅、上傳拖曳區 (DropZone)、載入狀態與即時日誌視窗。
+   - 辨識結果展示區 (ResultGrid, Table, ImagePreview)。
+   - 彈出視窗：裝備庫同步管理彈窗 (#dbModal)、API Key 與 AI 服務商設定彈窗 (#keyModal)。
+3. [SECTION: JS_GLOBAL_STATE]
+   - 全域變數 (currentOutfitData, currentImageBase64 等)、版本號設定 (BUILTIN_VERSION)。
+4. [SECTION: JS_PROVIDER_CONFIG]
+   - 多模型金鑰與服務商管理 (Gemini / OpenAI / 自訂 OpenRouter)、Modal 開關與 UI 同步。
+5. [SECTION: JS_INDEXEDDB_CACHE]
+   - IndexedDB 高速儲存引擎 (FF14_GLAMOUR_DB_V2)、自訂字典讀寫與重置。
+6. [SECTION: JS_SYNC_ENGINE]
+   - GitHub 遠端版本檢查、CSV 下載與前端「脫水減肥」演算法 (dehydrateItemCsvs)、本機 CSV 匯入。
+7. [SECTION: JS_UPLOAD_HANDLERS]
+   - 檔案選擇、拖放 (Drag & Drop) 監聽、剪貼簿圖片自動貼上 (Paste) 處理。
+8. [SECTION: JS_AI_DISPATCHER]
+   - 統一系統 Prompt (getUnifiedSystemPrompt)、各 AI 介面調度 (Gemini API 輪詢重試 / OpenAI 相容介面)。
+9. [SECTION: JS_EQUIPMENT_RESOLVER]
+   - 全語系統一瀑布流解析核心（英文優先 ➔ 日文覆核 ➔ 繁簡原文直通）、DuckDuckGo !ducky 鴨鴨好手氣。
+10. [SECTION: JS_UI_RENDER_EXPORT]
+    - 辨識結果渲染 (renderResult)、一鍵複製至 Excel、下載 CSV (含 UTF-8 BOM) 與 TXT 筆記匯出。
+================================================================================
+-->
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FF14 幻化外觀 AI 辨識小工具 v2.1.1</title>
+  <style>
+    /* === [SECTION: CSS_STYLES] START === */
+    :root {
+      --primary: #2c3e50;
+      --primary-light: #34495e;
+      --accent: #2980b9;
+      --accent-hover: #1f618d;
+      --bg: #f4f6f9;
+      --card-bg: #ffffff;
+      --text-main: #2c3e50;
+      --text-muted: #7f8c8d;
+      --border: #dcdde1;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+      --purple: #8e44ad;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "微軟正黑體", sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header (Point 4: 鎖定右上按鈕排版，說明獨立第二行) */
+    header {
+      background: linear-gradient(135deg, #1b2631, #2c3e50);
+      color: #fff;
+      padding: 22px 28px 18px;
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      margin-bottom: 20px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-title h1 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .v2-badge {
+      background: linear-gradient(135deg, #e67e22, #d35400);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 6px rgba(230, 126, 34, 0.4);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .header-subtext {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      color: #bdc3c7;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .header-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .header-btn.sync-alert {
+      background: #e67e22;
+      border-color: #d35400;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(230, 126, 34, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0); }
+    }
+
+    /* Version Notice Banner */
+    .version-banner {
+      display: none;
+      background: #fef9e7;
+      border: 1px solid #f9e79f;
+      border-left: 5px solid #f39c12;
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      font-size: 0.92rem;
+      color: #7d6608;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    .version-banner-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .version-banner-btn {
+      background: #f39c12;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .version-banner-btn:hover {
+      background: #d68910;
+    }
+
+    /* Upload Area */
+    .upload-card {
+      background: var(--card-bg);
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    .upload-card:hover, .upload-card.dragover {
+      border-color: var(--accent);
+      background: #ebf5fb;
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .upload-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .upload-hint {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    /* Modals */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 14px;
+      max-width: 600px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+      animation: popIn 0.25s ease-out;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.93); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header h3 {
+      font-size: 1.3rem;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-body {
+      font-size: 0.92rem;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .step-box {
+      background: #f8f9fa;
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 4px;
+    }
+
+    .step-box ol {
+      margin-left: 20px;
+      margin-top: 6px;
+    }
+
+    .step-box li {
+      margin-bottom: 4px;
+    }
+
+    .input-group {
+      margin-top: 14px;
+    }
+
+    .input-group label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 6px;
+      color: #333;
+    }
+
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 24px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    /* Database Sync Modal Specific */
+    .db-info-card {
+      background: #f4f6f9;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .db-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .status-badge.green { background: #d4efdf; color: #196f3d; }
+    .status-badge.orange { background: #fdebd0; color: #b9770e; }
+    .status-badge.blue { background: #d4e6f1; color: #1f618d; }
+
+    .source-box {
+      background: #fdfefe;
+      border: 1px solid #d6dbdf;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+      font-size: 0.85rem;
+    }
+
+    .source-box a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .source-box a:hover {
+      text-decoration: underline;
+    }
+
+    .patch-tip {
+      background: #eaf2f8;
+      border-left: 4px solid var(--accent);
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #1b4f72;
+      margin: 14px 0;
+    }
+
+    .sync-progress-box {
+      display: none;
+      margin: 16px 0;
+      background: #ebedef;
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: #d5dbdb;
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3498db, #2ecc71);
+      transition: width 0.3s;
+    }
+
+    .sync-status-text {
+      font-size: 0.85rem;
+      color: #555;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .drop-csv-zone {
+      border: 2px dashed #bdc3c7;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      background: #fafafa;
+      cursor: pointer;
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: #7f8c8d;
+      transition: all 0.2s;
+    }
+
+    .drop-csv-zone:hover {
+      border-color: var(--accent);
+      background: #f0f7fb;
+      color: var(--accent);
+    }
+
+    /* Result Section */
+    .result-section {
+      display: none;
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      margin-bottom: 24px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .outfit-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1b2631;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #219653; }
+    .btn-secondary { background: #eaeded; color: var(--text-main); }
+    .btn-secondary:hover { background: #d5d8dc; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-warning:hover { background: #d68910; }
+
+    /* Layout: Table + Image */
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Table */
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: #eaeded;
+      color: #2c3e50;
+      padding: 10px 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+
+    .slot-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: #2980b9;
+      text-align: center;
+      width: 100%;
+    }
+
+    .sub-name {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .dye-tag {
+      font-weight: 600;
+      color: #78281f;
+    }
+
+    .gear-link {
+      color: #1b2631;
+      font-weight: 700;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .gear-link:hover {
+      color: #2980b9;
+      text-decoration: underline;
+    }
+
+    .wiki-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #2471a3;
+      background: #ebf5fb;
+      border: 1px solid #d4e6f1;
+      border-radius: 4px;
+      text-decoration: none;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .wiki-btn:hover {
+      background: #2980b9;
+      color: #fff;
+      border-color: #2980b9;
+    }
+
+    .wiki-btn.google {
+      color: #7f8c8d;
+      background: #f8f9fa;
+      border-color: #e5e7e9;
+    }
+
+    .wiki-btn.google:hover {
+      background: #5d6d7e;
+      color: #fff;
+      border-color: #5d6d7e;
+    }
+
+    .wiki-btn.lucky {
+      color: #0e6251;
+      background: #e8f8f5;
+      border-color: #a3e4d7;
+    }
+
+    .wiki-btn.lucky:hover {
+      background: #16a085;
+      color: #fff;
+      border-color: #16a085;
+    }
+
+    /* Image Preview */
+    .image-preview-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      background: #fdfefe;
+      text-align: center;
+    }
+
+    .image-preview-card img {
+      max-width: 100%;
+      max-height: 480px;
+      object-fit: contain;
+      border-radius: 6px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Warning Note */
+    .note-box {
+      margin-top: 18px;
+      background: #fef9e7;
+      border-left: 4px solid #f1c40f;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      color: #7d6608;
+    }
+
+    /* Loading Spinner */
+    .loading-overlay {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      background: #fff;
+      border-radius: 14px;
+      margin-bottom: 24px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--accent);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-weight: 600;
+      color: var(--primary);
+      font-size: 1.05rem;
+    }
+
+    .loading-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Live Status Console */
+    .status-console {
+      margin-top: 20px;
+      background: #1b2631;
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: left;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.85rem;
+      border: 1px solid #2c3e50;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .console-header {
+      font-size: 0.75rem;
+      color: #85929e;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+    }
+
+    .log-item {
+      margin-bottom: 6px;
+      line-height: 1.45;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .log-time {
+      color: #7f8c8d;
+      flex-shrink: 0;
+    }
+
+    .log-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .log-badge.info { background: #2980b9; color: #fff; }
+    .log-badge.warn { background: #d35400; color: #fff; }
+    .log-badge.success { background: #27ae60; color: #fff; }
+
+    .log-text {
+      color: #ecf0f1;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #2ecc71;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+      /* === [SECTION: CSS_STYLES] END === */
+  </style>
+</head>
+<body>
+
+<!-- === [SECTION: HTML_DOM] START === -->
+<div class="container">
+  <!-- Header (全語系統一排版：按鈕右上固定，說明獨立下一行) -->
+  <header>
+    <div class="header-top">
+      <div class="header-title">
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.1.1版</span></h1>
+      </div>
+      <div class="header-actions">
+        <button class="header-btn" id="dbBtn" onclick="openDbModal()">
+          📦 <span id="dbBtnLabel">裝備庫: 官方同步</span>
+        </button>
+        <button class="header-btn" onclick="openKeyModal()">
+          🔑 <span id="keyBtnLabel">設定 API Key</span>
+        </button>
+      </div>
+    </div>
+    <div class="header-subtext">
+      拖入穿搭圖片 ──► AI辨識 (請自行連接 API，網頁不紀錄) ──► 灰機直連 / 鴨鴨好手氣 / Google
+    </div>
+  </header>
+
+  <!-- Auto Detected Version Notice Banner -->
+  <div class="version-banner" id="versionBanner">
+    <div class="version-banner-content">
+      <div>
+        <b>🔔 官方開源數據庫已更新！</b>
+        <span id="versionBannerText">偵測到遊戲有最新裝備數據，建議大改版後同步。</span>
+      </div>
+      <button class="version-banner-btn" onclick="openDbModal()">前往一鍵同步</button>
+    </div>
+  </div>
+
+  <!-- Upload Area -->
+  <div class="upload-card" id="dropZone" onclick="triggerFileInput()">
+    <div class="upload-icon">📸</div>
+    <div class="upload-title">點擊或拖放外觀截圖至此處（支援剪貼簿 Ctrl+V 貼上）</div>
+    <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF（建議使用帶有日文/英文裝備名稱標籤的 EC 截圖）</div>
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" id="loadingBox">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingMsg">AI 正在讀取圖片文字並索引官方裝備庫...</div>
+    <div class="loading-sub">⏳ 尖峰時段多伺服器自動協調約需 20~40 秒，請稍候</div>
+
+    <!-- Live Status Console -->
+    <div class="status-console" id="statusConsole">
+      <div class="console-header">⚡ 即時連線與分析日誌（自動切換伺服器備援）</div>
+      <div id="statusLogList"></div>
+    </div>
+  </div>
+
+  <!-- Result Section -->
+  <div class="result-section" id="resultSection">
+    <div class="result-header">
+      <div class="outfit-title" id="outfitTitle">【套裝】復古大地色系優雅侍者長裙風</div>
+      <div class="action-buttons">
+        <button class="btn btn-success" onclick="copyToClipboard()">📋 一鍵複製到 Excel</button>
+        <button class="btn btn-primary" onclick="downloadCSV()">💾 下載 CSV 表格</button>
+        <button class="btn btn-secondary" onclick="downloadTXT()">📝 下載 TXT 筆記</button>
+      </div>
+    </div>
+
+    <div class="result-grid">
+      <!-- Left: Table -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 14%;">部位</th>
+              <th style="width: 26%;">繁中裝備名稱</th>
+              <th style="width: 40%;">取得方式</th>
+              <th style="width: 20%;">染色設定</th>
+            </tr>
+          </thead>
+          <tbody id="itemsTableBody">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+
+        <!-- Warning / Note -->
+        <div class="note-box" id="noteBox"></div>
+      </div>
+
+      <!-- Right: Image Preview -->
+      <div class="image-preview-card">
+        <img id="previewImg" src="" alt="預覽圖">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database Management & Sync Modal (V2 New) -->
+<div class="modal-overlay" id="dbModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>📦 官方裝備資料庫管理 (V2)</h3>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 12px;">本工具內建輕量化裝備條目字典。當遊戲大改版推出新外觀時，可透過此處<b>一鍵同步開源數據庫</b>，永久儲存在本機瀏覽器中。</p>
+
+      <!-- Database Status Card -->
+      <div class="db-info-card">
+        <div class="db-status-row">
+          <span><b>當前本地版本：</b></span>
+          <span class="status-badge green" id="localVersionBadge">內建核心字典 (Patch 7.05+)</span>
+        </div>
+        <div class="db-status-row">
+          <span><b>雲端最新版本：</b></span>
+          <span class="status-badge blue" id="remoteVersionBadge">正在檢查 GitHub...</span>
+        </div>
+        <div class="db-status-row">
+          <span><b>收錄外觀條目：</b></span>
+          <span id="itemCountLabel">43+ 核心經典裝備 + 全名直連</span>
+        </div>
+      </div>
+
+      <!-- Transparent Data Source Disclosure -->
+      <div class="source-box">
+        <b>🌐 公開開源數據來源（透明披露，安心查驗）：</b><br>
+        • 主來源庫：<a href="https://github.com/InfSein/ffxiv-datamining-mixed" target="_blank">InfSein/ffxiv-datamining-mixed (GitHub)</a><br>
+        • 數據檔案：<code>chs/Item.csv</code> 與 <code>en/Item.csv</code><br>
+        • 備用社群：<a href="https://github.com/thewakingsands/ffxiv-datamining-cn" target="_blank">拂曉之血 (The Waking Sands) 開源數據庫</a><br>
+        <span style="font-size:0.78rem; color:#7f8c8d; margin-top:4px; display:block;">
+          🛡️ 安全聲明：本工具僅自上述開源倉庫讀取中英日名稱對照，絕無任何惡意代碼，所有運算皆在您的本機瀏覽器內執行。
+        </span>
+      </div>
+
+      <div class="patch-tip">
+        💡 <b>貼心提示：</b> 平時正常使用即可，<b>只有在遊戲大改版（如 7.1、7.2 等）推出全新外觀時</b>，才需要點擊下方按鈕同步最新庫。
+      </div>
+
+      <!-- Progress Container -->
+      <div class="sync-progress-box" id="syncProgressBox">
+        <div class="sync-status-text">
+          <span id="syncStepText">連線中...</span>
+          <span id="syncPercentText">0%</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-inner" id="syncProgressBar"></div>
+        </div>
+      </div>
+
+      <!-- Manual Drag & Drop CSV Fallback -->
+      <div class="drop-csv-zone" id="csvDropZone" onclick="document.getElementById('csvFileInput').click()">
+        📁 網路受限時：點擊或拖放本機 <code>Item.csv</code> 至此處，前端自動脫水減肥導入
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none;" onchange="handleCsvFileSelect(event)">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="resetToDefaultDb()" title="清除本機快取，恢復出廠內建字典">↩️ 恢復預設</button>
+      <button class="btn btn-secondary" onclick="closeDbModal()">關閉</button>
+      <button class="btn btn-primary" id="startSyncBtn" onclick="startOneClickSync()">🔄 一鍵同步最新裝備庫</button>
+    </div>
+  </div>
+</div>
+
+<!-- API Key / Provider Settings Modal -->
+<div class="modal-overlay" id="keyModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>⚙️ AI 服務商與 API Key 設定</h3>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 12px; color: #576574; font-size: 0.88rem; line-height: 1.5;">🔒 <b>隱私承諾：</b>本工具為 100% 純前端開源架構，無任何後端伺服器。您的金鑰<b>僅保存在您本機瀏覽器內 (localStorage)</b>，識別請求由瀏覽器直連官方 API，絕不上傳或紀錄任何資料，歡迎隨時按 F12 檢驗網路封包與程式碼。</p>
+      
+      <div class="input-group">
+        <label for="providerSelect">選擇 AI 服務商：</label>
+        <select id="providerSelect" onchange="onProviderChange()">
+          <option value="gemini">🌟 Google Gemini（推薦首選，每天 1,000 次免費）</option>
+          <option value="openai">⚡ OpenAI 官方（GPT-4o-mini，極度穩定，需付費帳號）</option>
+          <option value="custom">🌐 萬用自訂 / OpenRouter / OpenAI 相容接口（支援 Claude 3.5、Qwen 等）</option>
+        </select>
+      </div>
+
+      <!-- Gemini Config Panel -->
+      <div id="geminiConfigBox" style="margin-top: 14px;">
+        <div class="step-box">
+          <b>💡 Google Gemini 免費取得步驟（每天 1,000 次額度）：</b>
+          <ol>
+            <li>前往 <a href="https://aistudio.google.com/" target="_blank" style="color:var(--accent); font-weight:bold;">Google AI Studio 官網 (點此開新視窗)</a>。</li>
+            <li>登入 Google 帳號，點擊 <b>「Get API key」</b> $\to$ <b>「Create API key」</b>。</li>
+            <li>預設自動啟用 <code>gemini-3.5-flash-lite</code> 與 <code>gemini-3.1-flash-lite</code> 雙重高速輪詢。</li>
+          </ol>
+        </div>
+        <div class="input-group">
+          <label for="apiKeyInput">Google Gemini API Key：</label>
+          <input type="password" id="apiKeyInput" placeholder="AIzaSy...">
+        </div>
+      </div>
+
+      <!-- OpenAI Config Panel -->
+      <div id="openaiConfigBox" style="display:none; margin-top: 14px;">
+        <div class="step-box">
+          <b>💡 OpenAI 設定說明：</b>
+          <p style="margin:4px 0 0; font-size:0.85rem; color:#555;">
+            需使用已開通付費儲值的 OpenAI 帳號。預設呼叫 <code>gpt-4o-mini</code> 視覺模型，辨識一張約 0.001 美元（約 0.03 台幣），伺服器永不塞車。
+          </p>
+        </div>
+        <div class="input-group">
+          <label for="openaiKeyInput">OpenAI API Key：</label>
+          <input type="password" id="openaiKeyInput" placeholder="sk-proj-...">
+        </div>
+      </div>
+
+      <!-- Custom / OpenRouter Config Panel -->
+      <div id="customConfigBox" style="display:none; margin-top: 14px;">
+        <div class="step-box">
+          <b>💡 萬用自訂接口說明：</b>
+          <p style="margin:4px 0 0; font-size:0.85rem; color:#555;">
+            相容標準 OpenAI 格式（如 <a href="https://openrouter.ai/" target="_blank" style="color:var(--accent); font-weight:bold;">OpenRouter</a>、OneAPI、自建中轉站等）。一組 Key 可呼叫 Claude 3.5 Sonnet/Haiku、GPT-4o 或任何開源 Vision 模型！
+          </p>
+        </div>
+        <div class="input-group">
+          <label for="customBaseUrlInput">API Base URL (接口端點)：</label>
+          <input type="text" id="customBaseUrlInput" placeholder="https://openrouter.ai/api/v1">
+        </div>
+        <div class="input-group">
+          <label for="customModelInput">模型名稱 (Model ID)：</label>
+          <input type="text" id="customModelInput" placeholder="openai/gpt-4o-mini 或 anthropic/claude-3.5-haiku">
+        </div>
+        <div class="input-group">
+          <label for="customKeyInput">自訂 API Key：</label>
+          <input type="password" id="customKeyInput" placeholder="sk-or-v1-... 或自訂 Key">
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeKeyModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">確認儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">已成功複製到剪貼簿！</div>
+
+<!-- === [SECTION: HTML_DOM] END === -->
+
+<script>
+  let currentOutfitData = null;
+  let currentImageBase64 = null;
+  let currentImageMime = "image/jpeg";
+
+  // === [SECTION: JS_GLOBAL_STATE] START ===
+  // 全域狀態與 v2.1.1 版本設定
+  const BUILTIN_VERSION = {
+    version: "v2.1.1",
+    sha: "builtin-v2.1.1",
+    date: "2026-10-03",
+    label: "v2.1.1版"
+  };
+
+  // 1. 初始化
+  window.addEventListener("DOMContentLoaded", async () => {
+    updateKeyButtonState();
+    setupDropZone();
+    setupClipboardPaste();
+    await loadDatabaseFromIDB();
+    initDatabaseState();
+    checkRemoteVersionSilently();
+    if (!getApiKey()) {
+      openKeyModal();
+    }
+  });
+
+  // === [SECTION: JS_GLOBAL_STATE] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_PROVIDER_CONFIG] START ===
+  // ==============================================================================
+  // 多品牌 AI 服務商與 API Key 管理
+  function getActiveProvider() {
+    return localStorage.getItem("ff14_ai_provider") || "gemini";
+  }
+
+  function getApiKey() {
+    const provider = getActiveProvider();
+    if (provider === "openai") {
+      return localStorage.getItem("ff14_openai_api_key") || "";
+    } else if (provider === "custom") {
+      return localStorage.getItem("ff14_custom_api_key") || "";
+    } else {
+      return localStorage.getItem("ff14_gemini_api_key") || "";
+    }
+  }
+
+  function onProviderChange() {
+    const sel = document.getElementById("providerSelect").value;
+    document.getElementById("geminiConfigBox").style.display = (sel === "gemini") ? "block" : "none";
+    document.getElementById("openaiConfigBox").style.display = (sel === "openai") ? "block" : "none";
+    document.getElementById("customConfigBox").style.display = (sel === "custom") ? "block" : "none";
+  }
+
+  function updateKeyButtonState() {
+    const provider = getActiveProvider();
+    const key = getApiKey();
+    const btnLabel = document.getElementById("keyBtnLabel");
+    
+    let pName = "Google Gemini";
+    if (provider === "openai") pName = "OpenAI";
+    else if (provider === "custom") pName = "自訂 / OpenRouter";
+
+    if (key) {
+      btnLabel.innerText = `🤖 ${pName} (已設定)`;
+    } else {
+      btnLabel.innerText = `🔑 設定 AI Key (${pName})`;
+    }
+  }
+
+  function openKeyModal() {
+    const provider = getActiveProvider();
+    document.getElementById("providerSelect").value = provider;
+    document.getElementById("apiKeyInput").value = localStorage.getItem("ff14_gemini_api_key") || "";
+    document.getElementById("openaiKeyInput").value = localStorage.getItem("ff14_openai_api_key") || "";
+    document.getElementById("customBaseUrlInput").value = localStorage.getItem("ff14_custom_base_url") || "https://openrouter.ai/api/v1";
+    document.getElementById("customModelInput").value = localStorage.getItem("ff14_custom_model") || "openai/gpt-4o-mini";
+    document.getElementById("customKeyInput").value = localStorage.getItem("ff14_custom_api_key") || "";
+    onProviderChange();
+    document.getElementById("keyModal").style.display = "flex";
+  }
+
+  function closeKeyModal() {
+    document.getElementById("keyModal").style.display = "none";
+  }
+
+  function saveApiKey() {
+    const provider = document.getElementById("providerSelect").value;
+    localStorage.setItem("ff14_ai_provider", provider);
+
+    if (provider === "gemini") {
+      const gKey = document.getElementById("apiKeyInput").value.trim();
+      if (!gKey) { alert("請輸入有效的 Google Gemini API Key！"); return; }
+      localStorage.setItem("ff14_gemini_api_key", gKey);
+    } else if (provider === "openai") {
+      const oKey = document.getElementById("openaiKeyInput").value.trim();
+      if (!oKey) { alert("請輸入有效的 OpenAI API Key！"); return; }
+      localStorage.setItem("ff14_openai_api_key", oKey);
+    } else if (provider === "custom") {
+      const cKey = document.getElementById("customKeyInput").value.trim();
+      const cUrl = document.getElementById("customBaseUrlInput").value.trim();
+      const cModel = document.getElementById("customModelInput").value.trim();
+      if (!cKey) { alert("請輸入有效的自訂 API Key！"); return; }
+      if (!cUrl) { alert("請輸入有效的 API Base URL！"); return; }
+      if (!cModel) { alert("請輸入欲呼叫的模型名稱！"); return; }
+      localStorage.setItem("ff14_custom_api_key", cKey);
+      localStorage.setItem("ff14_custom_base_url", cUrl);
+      localStorage.setItem("ff14_custom_model", cModel);
+    }
+
+    updateKeyButtonState();
+    closeKeyModal();
+    showToast("✅ AI 服務商與金鑰設定儲存成功！");
+  }
+
+  // === [SECTION: JS_PROVIDER_CONFIG] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_INDEXEDDB_CACHE] START ===
+  // ==============================================================================
+  // IndexedDB 高速大容量存儲引擎（徹底解除 5MB 限制，輕鬆容納數萬筆官方全裝備數據庫）
+  const IDB_NAME = "FF14_GLAMOUR_DB_V2";
+  const IDB_STORE = "items_store";
+  let cachedCustomDb = null;
+
+  function openItemDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(IDB_NAME, 1);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      request.onsuccess = (e) => resolve(e.target.result);
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async function saveDatabaseToIDB(payload) {
+    try {
+      const db = await openItemDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        const store = tx.objectStore(IDB_STORE);
+        store.put(payload, "custom_dict");
+        tx.oncomplete = () => {
+          cachedCustomDb = payload;
+          resolve(true);
+        };
+        tx.onerror = (e) => reject(e.target.error);
+      });
+    } catch (e) {
+      console.warn("IndexedDB 存儲異常，降級處理：", e);
+      try {
+        localStorage.setItem("ff14_custom_items_dict", JSON.stringify(payload));
+        cachedCustomDb = payload;
+      } catch (err) {}
+    }
+  }
+
+  async function loadDatabaseFromIDB() {
+    if (cachedCustomDb) return cachedCustomDb;
+    try {
+      const db = await openItemDatabase();
+      return new Promise((resolve) => {
+        const tx = db.transaction(IDB_STORE, "readonly");
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.get("custom_dict");
+        req.onsuccess = () => {
+          if (req.result) {
+            cachedCustomDb = req.result;
+            resolve(cachedCustomDb);
+          } else {
+            try {
+              const raw = localStorage.getItem("ff14_custom_items_dict");
+              if (raw) {
+                cachedCustomDb = JSON.parse(raw);
+                resolve(cachedCustomDb);
+                return;
+              }
+            } catch (e) {}
+            resolve(null);
+          }
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch (e) {
+      try {
+        const raw = localStorage.getItem("ff14_custom_items_dict");
+        if (raw) return JSON.parse(raw);
+      } catch (err) {}
+      return null;
+    }
+  }
+
+  function getCustomDatabase() {
+    return cachedCustomDb;
+  }
+
+  function initDatabaseState() {
+    const customDb = getCustomDatabase();
+    const localBadge = document.getElementById("localVersionBadge");
+    const dbBtnLabel = document.getElementById("dbBtnLabel");
+    const itemCountLabel = document.getElementById("itemCountLabel");
+
+    if (customDb && customDb.version) {
+      localBadge.innerText = `已同步: ${customDb.version.label || customDb.version.sha}`;
+      localBadge.className = "status-badge green";
+      dbBtnLabel.innerText = `裝備庫: ${customDb.version.label || "最新版"}`;
+      itemCountLabel.innerText = `已收錄 ${Object.keys(customDb.items || {}).length} 筆裝備對照`;
+    } else {
+      localBadge.innerText = BUILTIN_VERSION.label;
+      localBadge.className = "status-badge green";
+      dbBtnLabel.innerText = "裝備庫: 內建 V2";
+      itemCountLabel.innerText = "50+ 核心經典裝備 + 全名直連";
+    }
+  }
+
+  function openDbModal() {
+    document.getElementById("dbModal").style.display = "flex";
+  }
+
+  function closeDbModal() {
+    document.getElementById("dbModal").style.display = "none";
+  }
+
+  // === [SECTION: JS_INDEXEDDB_CACHE] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_SYNC_ENGINE] START ===
+  // ==============================================================================
+  // 免 AI 靜默向 GitHub 檢查是否有新版本
+  async function checkRemoteVersionSilently() {
+    try {
+      const resp = await fetch("https://api.github.com/repos/InfSein/ffxiv-datamining-mixed/commits?per_page=1");
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data || data.length === 0) return;
+      
+      const commit = data[0];
+      const remoteSha = commit.sha.substring(0, 7);
+      const remoteDate = commit.commit?.committer?.date?.substring(0, 10) || "";
+      const commitMsg = commit.commit?.message?.split("\n")[0] || "";
+
+      const remoteBadge = document.getElementById("remoteVersionBadge");
+      remoteBadge.innerText = `${remoteDate} (${remoteSha})`;
+
+      // 檢查本機版本是否落後
+      const customDb = getCustomDatabase();
+      const currentSha = customDb?.version?.sha || BUILTIN_VERSION.sha;
+
+      if (currentSha !== remoteSha) {
+        // 發現新版本！
+        remoteBadge.className = "status-badge orange";
+        document.getElementById("dbBtn").classList.add("sync-alert");
+        
+        const banner = document.getElementById("versionBanner");
+        document.getElementById("versionBannerText").innerText = `開源庫有新版本更新（${commitMsg}，發布日：${remoteDate}），僅大改版時建議同步。`;
+        banner.style.display = "block";
+      } else {
+        remoteBadge.className = "status-badge green";
+        document.getElementById("dbBtn").classList.remove("sync-alert");
+        document.getElementById("versionBanner").style.display = "none";
+      }
+    } catch (e) {
+      console.log("GitHub 檢查暫時無法連線：", e);
+      document.getElementById("remoteVersionBadge").innerText = "離線 / 無法連線";
+    }
+  }
+
+  // V2 前端一鍵同步與「脫水減肥」引擎
+  async function startOneClickSync() {
+    const progressBox = document.getElementById("syncProgressBox");
+    const progressBar = document.getElementById("syncProgressBar");
+    const stepText = document.getElementById("syncStepText");
+    const percentText = document.getElementById("syncPercentText");
+    const syncBtn = document.getElementById("startSyncBtn");
+
+    progressBox.style.display = "block";
+    syncBtn.disabled = true;
+
+    try {
+      // Step 1: 取得最新 Commit 資訊
+      stepText.innerText = "正在取得 GitHub 最新版本資訊...";
+      progressBar.style.width = "10%";
+      percentText.innerText = "10%";
+
+      let remoteVersion = { sha: "latest", date: new Date().toISOString().substring(0, 10), label: "最新同步版" };
+      try {
+        const cResp = await fetch("https://api.github.com/repos/InfSein/ffxiv-datamining-mixed/commits?per_page=1");
+        if (cResp.ok) {
+          const cData = await cResp.json();
+          remoteVersion.sha = cData[0].sha.substring(0, 7);
+          remoteVersion.date = cData[0].commit?.committer?.date?.substring(0, 10) || "";
+          remoteVersion.label = `Patch (${remoteVersion.sha})`;
+        }
+      } catch (e) {}
+
+      // Step 2: 下載官方簡中裝備表 (chs)
+      stepText.innerText = "正在自開源庫下載官方簡中裝備表 (chs)...";
+      progressBar.style.width = "25%";
+      percentText.innerText = "25%";
+      const chsResp = await fetch("https://raw.githubusercontent.com/InfSein/ffxiv-datamining-mixed/master/chs/Item.csv");
+      if (!chsResp.ok) throw new Error("下載簡中裝備表失敗 (Status " + chsResp.status + ")");
+      const chsText = await chsResp.text();
+
+      // Step 3: 下載官方英文裝備表 (en)
+      stepText.innerText = "正在自開源庫下載官方英文裝備表 (en)...";
+      progressBar.style.width = "50%";
+      percentText.innerText = "50%";
+      const enResp = await fetch("https://raw.githubusercontent.com/InfSein/ffxiv-datamining-mixed/master/en/Item.csv");
+      if (!enResp.ok) throw new Error("下載英文裝備表失敗 (Status " + enResp.status + ")");
+      const enText = await enResp.text();
+
+      // Step 4: 下載官方日文裝備表 (ja) - 徹底解決 OCR 日文字對照
+      stepText.innerText = "正在自開源庫下載官方日文裝備表 (ja)...";
+      progressBar.style.width = "75%";
+      percentText.innerText = "75%";
+      const jaResp = await fetch("https://raw.githubusercontent.com/InfSein/ffxiv-datamining-mixed/master/ja/Item.csv");
+      if (!jaResp.ok) throw new Error("下載日文裝備表失敗 (Status " + jaResp.status + ")");
+      const jaText = await jaResp.text();
+
+      // Step 5: 瀏覽器前端「脫水減肥」（只過濾裝備部位，提取中英日全映射）
+      stepText.innerText = "正在進行前端脫水減肥（提煉中英日三語外觀字典）...";
+      progressBar.style.width = "90%";
+      percentText.innerText = "90%";
+
+      const dehydratedDict = dehydrateItemCsvs(chsText, enText, jaText);
+      const totalItems = Object.keys(dehydratedDict).length;
+
+      // Step 6: 存入 IndexedDB 高速儲存
+      stepText.innerText = `提煉完成！共 ${totalItems} 筆中英日外觀對照，正在寫入本機高速儲存庫...`;
+      progressBar.style.width = "100%";
+      percentText.innerText = "100%";
+
+      const payload = {
+        version: remoteVersion,
+        updatedAt: new Date().toISOString(),
+        items: dehydratedDict
+      };
+
+      await saveDatabaseToIDB(payload);
+
+      initDatabaseState();
+      document.getElementById("dbBtn").classList.remove("sync-alert");
+      document.getElementById("versionBanner").style.display = "none";
+
+      showToast(`🎉 裝備庫已成功同步至 ${remoteVersion.label}！`);
+      setTimeout(() => {
+        progressBox.style.display = "none";
+        syncBtn.disabled = false;
+        closeDbModal();
+      }, 1200);
+
+    } catch (err) {
+      alert("❌ 同步失敗：" + err.message + "\n若網路無法直接連線 GitHub，您亦可使用下方拖入本機 Item.csv 方式導入。");
+      progressBox.style.display = "none";
+      syncBtn.disabled = false;
+    }
+  }
+
+  // 前端 CSV 脫水減肥核心算法 (中英日三語全對照)
+  function dehydrateItemCsvs(chsText, enText, jaText) {
+    const chsLines = chsText.split("\n");
+    const enLines = enText.split("\n");
+    const jaLines = jaText ? jaText.split("\n") : [];
+
+    const chsMap = new Map();
+    // chs 第 4 行開始為數據
+    for (let i = 4; i < chsLines.length; i++) {
+      const line = chsLines[i].trim();
+      if (!line) continue;
+      const cols = parseCsvLine(line);
+      if (cols.length > 18) {
+        const id = cols[0];
+        const nameZh = cols[1];
+        const slot = cols[18];
+        // 只要不是 0 (代表具備穿戴部位的裝備)
+        if (slot && slot !== "0" && nameZh) {
+          chsMap.set(id, nameZh);
+        }
+      }
+    }
+
+    const result = {};
+    // 1. 索引英文名 (含去除常見前綴如 Far, The, Augmented, Idealized)
+    for (let i = 4; i < enLines.length; i++) {
+      const line = enLines[i].trim();
+      if (!line) continue;
+      const cols = parseCsvLine(line);
+      if (cols.length > 18) {
+        const id = cols[0];
+        const nameEn = cols[1];
+        if (chsMap.has(id)) {
+          const nameZh = chsMap.get(id);
+          if (nameEn) {
+            result[nameEn] = nameZh;
+            result[nameEn.toLowerCase()] = nameZh;
+            
+            // 索引去除前綴版本，防 AI 漏讀
+            if (nameEn.startsWith("Far ")) {
+              const stripped = nameEn.substring(4);
+              result[stripped] = nameZh;
+              result[stripped.toLowerCase()] = nameZh;
+            }
+            if (nameEn.startsWith("The ")) {
+              const stripped = nameEn.substring(4);
+              result[stripped] = nameZh;
+              result[stripped.toLowerCase()] = nameZh;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. 索引日文名 (日文名稱最精確，徹底解決 OCR 漏看英文的問題)
+    for (let i = 4; i < jaLines.length; i++) {
+      const line = jaLines[i].trim();
+      if (!line) continue;
+      const cols = parseCsvLine(line);
+      if (cols.length > 18) {
+        const id = cols[0];
+        const nameJa = cols[1];
+        if (chsMap.has(id)) {
+          const nameZh = chsMap.get(id);
+          if (nameJa) {
+            result[nameJa] = nameZh;
+            result[nameJa.toLowerCase()] = nameZh;
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  function parseCsvLine(text) {
+    let p = '', row = [''], i = 0, r = 0, q = false;
+    for (let c of text) {
+      if (c === '"') {
+        if (q && text[i+1] === '"') { row[r] += '"'; i++; }
+        else { q = !q; }
+      } else if (c === ',' && !q) {
+        row[++r] = '';
+      } else {
+        row[r] += c;
+      }
+      i++;
+    }
+    return row;
+  }
+
+  // 手動拖入本機 Item.csv 備用機制
+  function handleCsvFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    processLocalCsvFile(file);
+  }
+
+  function processLocalCsvFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const text = e.target.result;
+        const lines = text.split("\n");
+        const customDict = {};
+        for (let i = 4; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const cols = parseCsvLine(line);
+          if (cols.length > 18 && cols[18] !== "0") {
+            const name = cols[1];
+            if (name) customDict[name] = name;
+          }
+        }
+        const payload = {
+          version: { sha: "local", date: new Date().toISOString().substring(0, 10), label: "手動導入版" },
+          updatedAt: new Date().toISOString(),
+          items: customDict
+        };
+        saveDatabaseToIDB(payload).then(() => {
+          initDatabaseState();
+          showToast("✅ 本機 CSV 脫水導入成功！");
+          closeDbModal();
+        });
+      } catch (err) {
+        alert("解析 CSV 失敗：" + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function resetToDefaultDb() {
+    if (confirm("確定要清除自訂同步數據，恢復為出廠預設字典嗎？")) {
+      try {
+        const db = await openItemDatabase();
+        const tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).delete("custom_dict");
+      } catch (e) {}
+      localStorage.removeItem("ff14_custom_items_dict");
+      cachedCustomDb = null;
+      initDatabaseState();
+      showToast("已恢復為出廠預設字典");
+    }
+  }
+
+  // === [SECTION: JS_SYNC_ENGINE] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_UPLOAD_HANDLERS] START ===
+  // ==============================================================================
+  // 2. 拖曳上傳與檔案選擇 (支援剪貼簿貼上)
+  function triggerFileInput() {
+    document.getElementById("fileInput").click();
+  }
+
+  function setupDropZone() {
+    const dropZone = document.getElementById("dropZone");
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+      document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        processFile(files[0]);
+      }
+    });
+  }
+
+  function setupClipboardPaste() {
+    window.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let item of items) {
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            processFile(file);
+            showToast("📸 已自動讀取剪貼簿截圖！");
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleFileSelect(event) {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      processFile(files[0]);
+    }
+  }
+
+  function processFile(file) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      openKeyModal();
+      return;
+    }
+
+    currentImageMime = file.type || "image/jpeg";
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      document.getElementById("previewImg").src = dataUrl;
+      currentImageBase64 = dataUrl.split(',')[1];
+      callVisionAI(currentImageBase64, currentImageMime);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // === [SECTION: JS_UPLOAD_HANDLERS] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_AI_DISPATCHER] START ===
+  // ==============================================================================
+  // 統一視覺 AI 提示詞 (Google Gemini / OpenAI / OpenRouter / 萬用自訂接口 共用)
+  function getUnifiedSystemPrompt() {
+    return `你是一名精通《最終幻想14》（Final Fantasy XIV / FF14）全裝備數據庫與幻化穿搭風格的專家。
+這是一張玩家分享的幻化穿搭展示卡片。
+
+請嚴格遵循以下【全語系統一辨識核心規範】：
+1. 【忠實讀取卡片原文，嚴禁腦補與擅自轉換】：
+   - 【英文與日文原名 (name_en_jp)】：
+     * 若卡片上有印製英文名或日文名，請一字不漏、精準拼寫讀取，填入 name_en_jp（格式：英文原名 / 日文原名，例如：Idealized Arbatel Bottoms / アイディアル・アルバテルボトム、Augmented Forgeking's Boots / フォージキングブーツRE）。
+     * 若卡片【完全沒有】英文或日文（如純中文卡片），【絕對禁止自行翻譯或想像假英文】，name_en_jp 必須直接填寫「無」！
+   - 【裝備名稱 (name_zh)】：
+     * 若卡片為繁體中文（如：光之幻化館），請 100% 忠實保留卡片繁體原文（例如：二號B型高筒靴、改良型水晶都精準眼罩、斯卡拉精準長衣），【嚴禁擅自簡繁互轉】或篡改名詞！
+     * 若卡片為簡體中文、韓文或其他語言，請 100% 忠實保留卡片上的語言原文。
+     * 若卡片為純英日文（無中文），可在 name_zh 填入對應的標準繁體中文譯名。
+
+2. 【染色與取得途徑】：
+   - 染色：若有標註染劑名稱或色號，請填寫（如：砲鋼黑染劑、煤玉黑染劑、或 ①色號 / ②色號；若無則填寫未染色）。
+   - 取得途徑：請填寫商城購買、副本等級掉落、NPC工票/軍票/青船幣兌換或任務獎勵等。
+
+3. 【穿搭注意事項】：
+   - 若混用了不同生產/採集職業或戰鬥特職專屬裝備（AF裝），請在 note 中特別註明投影時的職業限制提示。
+
+請務必以繁體中文與嚴格 JSON 格式輸出，不得輸出額外解釋或非 JSON 內容。格式範例：
+{
+  "outfit_title": "套裝風格標題",
+  "note": "穿搭特色或投影職業限制提示",
+  "items": [
+    {
+      "slot": "部位（頭部、身體、手部、腿部、腳部、耳飾）",
+      "name_zh": "卡片上的名稱原文（繁中卡片100%保留繁中，簡中/韓文卡片100%保留原文）",
+      "name_en_jp": "卡片上的英文/日文原名（卡片若無英日文請填寫「無」，嚴禁腦補假英文）",
+      "source": "取得途徑（商城購買、副本掉落、NPC兌換等）",
+      "dye": "染色設定（如：砲鋼黑染劑 或 未染色）"
+    }
+  ]
+}`;
+  }
+
+  // 統一視覺 AI 調度核心 (支援 Google Gemini、OpenAI、OpenRouter / 自訂接口)
+  async function callVisionAI(base64Data, mimeType) {
+    const provider = getActiveProvider();
+    if (provider === "openai") {
+      const key = localStorage.getItem("ff14_openai_api_key") || "";
+      await callOpenAICompatibleAPI(base64Data, mimeType, key, "gpt-4o-mini", "https://api.openai.com/v1");
+    } else if (provider === "custom") {
+      const key = localStorage.getItem("ff14_custom_api_key") || "";
+      const baseUrl = localStorage.getItem("ff14_custom_base_url") || "https://openrouter.ai/api/v1";
+      const model = localStorage.getItem("ff14_custom_model") || "openai/gpt-4o-mini";
+      await callOpenAICompatibleAPI(base64Data, mimeType, key, model, baseUrl);
+    } else {
+      const key = localStorage.getItem("ff14_gemini_api_key") || "";
+      await callGeminiAPI(base64Data, mimeType, key);
+    }
+  }
+
+  // OpenAI 相容介面調用器 (支援 OpenAI、OpenRouter、OneAPI、自建 API)
+  async function callOpenAICompatibleAPI(base64Data, mimeType, apiKey, modelName, baseUrl) {
+    const loadingBox = document.getElementById("loadingBox");
+    const resultSection = document.getElementById("resultSection");
+    const loadingMsg = document.getElementById("loadingMsg");
+    const statusLogList = document.getElementById("statusLogList");
+
+    loadingBox.style.display = "block";
+    resultSection.style.display = "none";
+    statusLogList.innerHTML = "";
+
+    const cleanBaseUrl = (baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, '');
+    const endpoint = cleanBaseUrl.endsWith("/chat/completions") ? cleanBaseUrl : `${cleanBaseUrl}/chat/completions`;
+
+    appendStatusLog("連線中", `正在連線至 ${modelName} (${cleanBaseUrl})...`, "info");
+    loadingMsg.innerText = `正在透過 ${modelName} 辨識圖片裝備與染色...`;
+
+    const promptText = getUnifiedSystemPrompt();
+
+    const payload = {
+      model: modelName,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: promptText },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1
+    };
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": window.location.href,
+          "X-Title": "FF14 Glamour OCR Tool"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${errText.substring(0, 250)}`);
+      }
+
+      const resData = await resp.json();
+      const content = resData.choices?.[0]?.message?.content;
+      if (!content) throw new Error("API 回傳內容為空");
+
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith("```json")) {
+        cleanContent = cleanContent.replace(/^```json\s*/i, "").replace(/\s*```$/, "");
+      } else if (cleanContent.startsWith("```")) {
+        cleanContent = cleanContent.replace(/^```\s*/, "").replace(/\s*```$/, "");
+      }
+
+      const parsedData = JSON.parse(cleanContent);
+      appendStatusLog("解析成功", `已成功自 ${modelName} 獲取裝備數據！`, "success");
+      loadingBox.style.display = "none";
+      currentOutfitData = parsedData;
+      renderResult(parsedData);
+      showToast("🎉 幻化外觀辨識成功！");
+    } catch (err) {
+      loadingBox.style.display = "none";
+      appendStatusLog("呼叫異常", err.message, "warn");
+      alert(`❌ 呼叫 ${modelName} 失敗：\n${err.message}\n\n💡 若為跨域 (CORS) 錯誤，建議改用 OpenRouter (https://openrouter.ai/api/v1) 作為中轉接口。`);
+    }
+  }
+
+  function appendStatusLog(badgeText, msgText, type = "info") {
+    const logList = document.getElementById("statusLogList");
+    if (!logList) return;
+    
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    
+    const item = document.createElement("div");
+    item.className = "log-item";
+    item.innerHTML = `
+      <span class="log-time">[${timeStr}]</span>
+      <span class="log-badge ${type}">${badgeText}</span>
+      <span class="log-text">${escapeHtml(msgText)}</span>
+    `;
+    logList.appendChild(item);
+    
+    const consoleBox = document.getElementById("statusConsole");
+    if (consoleBox) {
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+  }
+
+  // 3. 呼叫 Gemini API (多模型備用機制與即時狀態日誌)
+  async function callGeminiAPI(base64Data, mimeType, apiKey) {
+    const loadingBox = document.getElementById("loadingBox");
+    const resultSection = document.getElementById("resultSection");
+    const loadingMsg = document.getElementById("loadingMsg");
+    const statusLogList = document.getElementById("statusLogList");
+
+    loadingBox.style.display = "block";
+    resultSection.style.display = "none";
+    statusLogList.innerHTML = "";
+
+    appendStatusLog("準備中", "已讀取截圖資料，正在連線至 Gemini Vision 模型...", "info");
+
+    const modelsToTry = [
+      "gemini-3.5-flash-lite",    // 每天 500 次！RPM 15，極速且額度高達 25 倍！
+      "gemini-3.1-flash-lite",    // 每天 500 次！RPM 15，雙重保障
+      "gemini-flash-lite-latest", // 最新輕量模型 (500 次/天)
+      "gemini-3.5-flash",         // 備援標準模型 (20 次/天)
+      "gemini-3.6-flash",         // 備援模型 (20 次/天)
+      "gemini-3.7-flash",         // 備援模型 (20 次/天)
+      "gemini-3.8-flash"          // 備援模型 (20 次/天)
+    ];
+
+    const responseSchema = {
+      type: "OBJECT",
+      properties: {
+        outfit_title: { type: "STRING", description: "套裝風格標題" },
+        note: { type: "STRING", description: "穿搭特色或投影職業限制警告" },
+        items: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              slot: { type: "STRING", description: "部位（頭部、身體、手部、腿部、腳部、耳飾）" },
+              name_zh: { type: "STRING", description: "繁體中文常用外觀名稱（如：東方女生髮帶、男爵外套、理想化的古術打底褲）" },
+              name_huiji: { type: "STRING", description: "灰機wiki精確官方條目名稱（簡體中文官方全名，用於直連 wiki/物品:名稱，例如：东方女生发带、男爵外套、理想化的古术打底裤、特制女仆发带、雀翎巧匠及膝裤、理想巫术外套、占星臂套、烹调师护腿、宫廷恋人强攻耳饰）" },
+              name_en_jp: { type: "STRING", description: "英文 / 日文官方正名" },
+              source: { type: "STRING", description: "取得途徑（副本等級、NPC工票/軍票、商城、博姿雅堡壘追憶戰）" },
+              dye: { type: "STRING", description: "染色設定（如 ①色號 / ②色號 或 未染色）" }
+            },
+            required: ["slot", "name_zh", "name_huiji", "name_en_jp", "source", "dye"]
+          }
+        }
+      },
+      required: ["outfit_title", "items", "note"]
+    };
+
+    const promptText = getUnifiedSystemPrompt();
+
+    const payload = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType, data: base64Data } },
+          { text: promptText }
+        ]
+      }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: responseSchema,
+        temperature: 0.1
+      }
+    };
+
+    const startTime = Date.now();
+    const MAX_WAIT_MS = 180000; // 3 分鐘 (180 秒) 自動輪詢重試上限
+
+    let round = 1;
+    let lastError = "";
+
+    while (Date.now() - startTime < MAX_WAIT_MS) {
+      const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+      if (round > 1) {
+        appendStatusLog("輪詢排隊", `🔄 發動第 ${round} 輪請求（已排隊等待 ${elapsedSec} 秒 / 3分鐘上限）...`, "info");
+      }
+
+      for (let model of modelsToTry) {
+        if (Date.now() - startTime >= MAX_WAIT_MS) break;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        try {
+          const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
+          loadingMsg.innerText = `[已排隊 ${currentElapsed}s / 3分上限] 正在連線 ${model} 讀取外觀...`;
+          appendStatusLog("嘗試連線", `正在連線至模型：${model} ...`, "info");
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const resJson = await response.json();
+            if (resJson.candidates && resJson.candidates.length > 0) {
+              appendStatusLog("解析成功", `🎉 模型 ${model} 連線成功！正在索引資料庫並繪製卡片...`, "success");
+              const rawText = resJson.candidates[0].content.parts[0].text;
+              currentOutfitData = JSON.parse(rawText);
+              renderResult(currentOutfitData);
+              loadingBox.style.display = "none";
+              return;
+            }
+          } else {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || response.statusText;
+            lastError = `${model}: ${response.status} - ${errMsg}`;
+            
+            if (response.status === 503) {
+              appendStatusLog("伺服器繁忙", `⚠️ ${model} 尖峰負載過高 (503)，排隊自動切換...`, "warn");
+            } else {
+              appendStatusLog("連線重試", `⚠️ ${model} 回應異常 (Status ${response.status})，自動切換...`, "warn");
+            }
+          }
+        } catch (err) {
+          clearTimeout(timeoutId);
+          lastError = err.message;
+          if (err.name === 'AbortError') {
+            appendStatusLog("連線逾時", `⚠️ ${model} 超時無回應，切換下一個...`, "warn");
+          } else {
+            appendStatusLog("連線異常", `⚠️ ${model} 連線失敗 (${err.message})`, "warn");
+          }
+        }
+      }
+
+      round++;
+      const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
+      if (Date.now() - startTime < MAX_WAIT_MS) {
+        appendStatusLog("尖峰冷卻", `⏳ 伺服器尖峰暫時堵塞，冷卻 4 秒後自動從 3.5 再次輪詢（已等待 ${currentElapsed}s）...`, "warn");
+        loadingMsg.innerText = `[已等待 ${currentElapsed}s / 3分上限] Google 尖峰排隊中，4秒後自動重試...`;
+        await new Promise(r => setTimeout(r, 4000));
+      }
+    }
+
+    loadingBox.style.display = "none";
+    alert(`❌ 已自動排隊重試滿 3 分鐘，所有伺服器均處於尖峰高負載狀態。\n最新錯誤：${lastError}\n\n💡 Google 尖峰擁塞通常持續幾分鐘，請稍候片刻再試。`);
+  }
+
+  // 內建核心經典外觀對照表 (V2 預設庫，優先級最高，保證 100% 精準)
+  // === [SECTION: JS_AI_DISPATCHER] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_EQUIPMENT_RESOLVER] START ===
+  // ==============================================================================
+  // 全語系統一瀑布流解析核心（英文 ➔ 日文 ➔ 繁簡中文/各國語言原文）
+  // 每一級統一遵循：優先查詢官方同步大庫 ➔ 未收錄則鴨鴨好手氣 (!ducky) 秒速直達第 1 名灰機條目！
+  function getHuijiWikiUrl(item) {
+    const rawZh = (item.name_zh || "").trim();
+    const rawEnJp = (item.name_en_jp || "").trim();
+
+    // 提取英文與日文原名
+    let cleanEn = "";
+    let cleanJa = "";
+    if (rawEnJp && rawEnJp !== "無" && rawEnJp !== "None") {
+      const parts = rawEnJp.split("/").map(s => s.trim()).filter(Boolean);
+      for (let p of parts) {
+        if (!cleanEn && /[a-zA-Z]/.test(p)) cleanEn = p;
+        if (!cleanJa && /[\u3040-\u30ff]/.test(p)) cleanJa = p;
+      }
+    }
+
+    const customDb = getCustomDatabase();
+
+    // ------------------------------------------------------------------------
+    // 順序 1：英文優先匹配（有日文則交叉覆核 ➔ 大庫未收錄則英文鴨鴨好手氣）
+    // ------------------------------------------------------------------------
+    if (cleanEn) {
+      if (customDb && customDb.items) {
+        // 先以英文查詢官方道具庫
+        let matchedZh = customDb.items[cleanEn] || customDb.items[cleanEn.toLowerCase()] || null;
+        if (matchedZh) {
+          let verified = cleanJa && customDb.items[cleanJa] === matchedZh;
+          item.resolved_name = matchedZh;
+          return {
+            url: `https://ff14.huijiwiki.com/wiki/%E7%89%A9%E5%93%81:${encodeURIComponent(matchedZh)}`,
+            isLucky: false,
+            label: "🔗 灰機wiki",
+            tooltip: `官方庫英文直連：《物品:${matchedZh}》${verified ? '（日文覆核通過）' : ''}`
+          };
+        }
+
+        // 若英文未在庫中，但卡片有日文，嘗試日文大庫匹配
+        if (cleanJa && customDb.items[cleanJa]) {
+          const jaMatched = customDb.items[cleanJa];
+          item.resolved_name = jaMatched;
+          return {
+            url: `https://ff14.huijiwiki.com/wiki/%E7%89%A9%E5%93%81:${encodeURIComponent(jaMatched)}`,
+            isLucky: false,
+            label: "🔗 灰機wiki",
+            tooltip: `官方庫日文直連：《物品:${jaMatched}》`
+          };
+        }
+      }
+
+      // 官方大庫未收錄（新版或未同步）：以英文觸發鴨鴨好手氣無感直達
+      return {
+        url: `https://duckduckgo.com/?q=${encodeURIComponent('!ducky site:ff14.huijiwiki.com "' + cleanEn + '"')}`,
+        isLucky: true,
+        label: "✨ 灰機好手氣",
+        tooltip: `💡 以英文「${cleanEn}」好手氣無感直達第 1 名灰機條目（免確認頁）！`
+      };
+    }
+
+    // ------------------------------------------------------------------------
+    // 順序 2：沒有英文，查日文（大庫匹配 ➔ 大庫未收錄則日文鴨鴨好手氣）
+    // ------------------------------------------------------------------------
+    if (cleanJa) {
+      if (customDb && customDb.items && customDb.items[cleanJa]) {
+        const jaMatched = customDb.items[cleanJa];
+        item.resolved_name = jaMatched;
+        return {
+          url: `https://ff14.huijiwiki.com/wiki/%E7%89%A9%E5%93%81:${encodeURIComponent(jaMatched)}`,
+          isLucky: false,
+          label: "🔗 灰機wiki",
+          tooltip: `官方庫日文直連：《物品:${jaMatched}》`
+        };
+      }
+
+      // 官方大庫未收錄：以日文觸發鴨鴨好手氣無感直達
+      return {
+        url: `https://duckduckgo.com/?q=${encodeURIComponent('!ducky site:ff14.huijiwiki.com "' + cleanJa + '"')}`,
+        isLucky: true,
+        label: "✨ 灰機好手氣",
+        tooltip: `💡 以日文「${cleanJa}」好手氣無感直達第 1 名灰機條目（免確認頁）！`
+      };
+    }
+
+    // ------------------------------------------------------------------------
+    // 順序 3：沒有英日文，查繁中/簡中/各國原文（大庫匹配 ➔ 未收錄則原文鴨鴨好手氣）
+    // ------------------------------------------------------------------------
+    if (rawZh) {
+      if (customDb && customDb.items && customDb.items[rawZh]) {
+        const zhMatched = customDb.items[rawZh];
+        item.resolved_name = zhMatched;
+        return {
+          url: `https://ff14.huijiwiki.com/wiki/%E7%89%A9%E5%93%81:${encodeURIComponent(zhMatched)}`,
+          isLucky: false,
+          label: "🔗 灰機wiki",
+          tooltip: `官方庫直連：《物品:${zhMatched}》`
+        };
+      }
+
+      // 官方大庫未收錄（或名詞差異）：以卡片原文觸發鴨鴨好手氣無感直達
+      return {
+        url: `https://duckduckgo.com/?q=${encodeURIComponent('!ducky site:ff14.huijiwiki.com ' + rawZh)}`,
+        isLucky: true,
+        label: "✨ 灰機好手氣",
+        tooltip: `💡 以原文「${rawZh}」好手氣無感直達第 1 名灰機條目（免確認頁）！`
+      };
+    }
+
+    // 兜底方案
+    return {
+      url: "https://ff14.huijiwiki.com/",
+      isLucky: false,
+      label: "🔗 灰機wiki",
+      tooltip: "灰機wiki首頁"
+    };
+  }
+
+  function getGoogleHuijiUrl(item) {
+    const rawZh = (item.name_zh || "").trim();
+    const rawEnJp = (item.name_en_jp || "").trim();
+
+    let cleanEn = "";
+    let cleanJa = "";
+    if (rawEnJp && rawEnJp !== "無" && rawEnJp !== "None") {
+      const parts = rawEnJp.split("/").map(s => s.trim()).filter(Boolean);
+      for (let p of parts) {
+        if (!cleanEn && /[a-zA-Z]/.test(p)) cleanEn = p;
+        if (!cleanJa && /[\u3040-\u30ff]/.test(p)) cleanJa = p;
+      }
+    }
+
+    // 順序優先級：英文 ➔ 日文 ➔ 原文
+    let queryTerm = cleanEn ? `"${cleanEn}"` : (cleanJa ? `"${cleanJa}"` : rawZh);
+    return `https://www.google.com/search?q=${encodeURIComponent('site:ff14.huijiwiki.com ' + queryTerm)}`;
+  }
+  // === [SECTION: JS_EQUIPMENT_RESOLVER] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_UI_RENDER_EXPORT] START ===
+  // ==============================================================================
+  // 4. 渲染結果到畫面上 (繁中歸繁中、英日雙軌呈現)
+  function renderResult(data) {
+    document.getElementById("outfitTitle").innerText = data.outfit_title || "【套裝】外觀穿搭";
+    
+    const tbody = document.getElementById("itemsTableBody");
+    tbody.innerHTML = "";
+
+    (data.items || []).forEach(item => {
+      const wikiInfo = getHuijiWikiUrl(item);
+      const googleUrl = getGoogleHuijiUrl(item);
+      const displayGearName = item.name_zh; // 繁中歸繁中，絕對保留原樣！
+      const btnClass = wikiInfo.isLucky ? "wiki-btn lucky" : "wiki-btn";
+
+      // 純中文卡片不顯示多餘的「無」或空行
+      const hasEnJp = item.name_en_jp && item.name_en_jp !== "無" && item.name_en_jp !== "None" && item.name_en_jp.trim() !== "";
+      const subNameHtml = hasEnJp ? `<div class="sub-name">${escapeHtml(item.name_en_jp)}</div>` : "";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="slot-badge">${escapeHtml(item.slot)}</span></td>
+        <td>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
+            <a href="${wikiInfo.url}" target="_blank" class="gear-link" title="${escapeHtml(wikiInfo.tooltip)}">
+              ${escapeHtml(displayGearName)}
+            </a>
+            <div style="display:flex; gap:4px;">
+              <a href="${wikiInfo.url}" target="_blank" class="${btnClass}" title="${escapeHtml(wikiInfo.tooltip)}">${wikiInfo.label}</a>
+              <a href="${googleUrl}" target="_blank" class="wiki-btn google" title="在 Google 瀏覽此裝備的所有灰機搜尋結果">🔍 Google</a>
+            </div>
+          </div>
+          ${subNameHtml}
+        </td>
+        <td>${escapeHtml(item.source)}</td>
+        <td><span class="dye-tag">${escapeHtml(item.dye)}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const noteBox = document.getElementById("noteBox");
+    if (data.note) {
+      noteBox.innerHTML = `<b>💡 穿搭提醒：</b> ${escapeHtml(data.note)}`;
+      noteBox.style.display = "block";
+    } else {
+      noteBox.style.display = "none";
+    }
+
+    document.getElementById("resultSection").style.display = "block";
+    document.getElementById("resultSection").scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // 5. 匯出功能（一鍵複製到 Excel、下載 CSV、下載 TXT）
+  function copyToClipboard() {
+    if (!currentOutfitData) return;
+    
+    let lines = [];
+    lines.push(["部位", "繁中裝備名稱", "英文 / 日文名稱", "取得方式", "染色設定", "灰機wiki網址"].join("\t"));
+    (currentOutfitData.items || []).forEach(it => {
+      const wikiInfo = getHuijiWikiUrl(it);
+      const gearName = it.resolved_name || it.name_zh;
+      lines.push([it.slot, gearName, it.name_en_jp, it.source, it.dye, wikiInfo.url].join("\t"));
+    });
+    if (currentOutfitData.note) {
+      lines.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].join("\t"));
+    }
+
+    const textToCopy = lines.join("\n");
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      showToast("📋 已複製表格（含灰機直連網址）！在 Excel 按 Ctrl+V 即可貼上！");
+    }).catch(err => {
+      alert("複製失敗，請手動反白選取。");
+    });
+  }
+
+  function downloadCSV() {
+    if (!currentOutfitData) return;
+    
+    let csvRows = [];
+    csvRows.push(["部位", "繁中裝備名稱", "英文 / 日文名稱", "取得方式", "染色設定", "灰機wiki網址"].map(escapeCsv).join(","));
+    
+    (currentOutfitData.items || []).forEach(it => {
+      const wikiInfo = getHuijiWikiUrl(it);
+      const gearName = it.resolved_name || it.name_zh;
+      csvRows.push([it.slot, gearName, it.name_en_jp, it.source, it.dye, wikiInfo.url].map(escapeCsv).join(","));
+    });
+    
+    if (currentOutfitData.note) {
+      csvRows.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].map(escapeCsv).join(","));
+    }
+
+    // 加入 UTF-8 BOM (\uFEFF)，保證 Windows Excel 打開絕對不亂碼！
+    const csvString = "\uFEFF" + csvRows.join("\r\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const filename = `${sanitizeFilename(currentOutfitData.outfit_title || "FF14外觀")}.csv`;
+    downloadBlob(blob, filename);
+  }
+
+  function downloadTXT() {
+    if (!currentOutfitData) return;
+    
+    let lines = [];
+    lines.push(`【${currentOutfitData.outfit_title || "FF14 外觀穿搭"}】`);
+    lines.push("=".repeat(50));
+    (currentOutfitData.items || []).forEach(it => {
+      const wikiInfo = getHuijiWikiUrl(it);
+      const gearName = it.resolved_name || it.name_zh;
+      lines.push(`• [${it.slot}] ${gearName}`);
+      lines.push(`  原名：${it.name_en_jp}`);
+      lines.push(`  來源：${it.source}`);
+      lines.push(`  染色：${it.dye}`);
+      lines.push(`  灰機：${wikiInfo.url}`);
+      lines.push("");
+    });
+    if (currentOutfitData.note) {
+      lines.push("-".repeat(50));
+      lines.push(`💡 穿搭提醒：${currentOutfitData.note}`);
+    }
+
+    const blob = new Blob([lines.join("\r\n")], { type: "text/plain;charset=utf-8;" });
+    const filename = `${sanitizeFilename(currentOutfitData.outfit_title || "FF14外觀")}.txt`;
+    downloadBlob(blob, filename);
+  }
+
+  function escapeCsv(val) {
+    if (val == null) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  }
+
+  function sanitizeFilename(name) {
+    return name.replace(/[\\/:*?"<>|]/g, "_").trim();
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById("toast");
+    toast.innerText = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2800);
+  }
+
+  function escapeHtml(text) {
+    if (!text) return "";
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  // === [SECTION: JS_UI_RENDER_EXPORT] END ===
+</script>
+
+</body>
+</html>
