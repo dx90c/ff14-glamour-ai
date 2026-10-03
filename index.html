@@ -1680,7 +1680,7 @@
       "name_zh": "卡片上的名稱原文（繁中卡片100%保留繁中，簡中/韓文卡片100%保留原文）",
       "name_en_jp": "卡片上的英文/日文原名（卡片若無英日文請填寫「無」，嚴禁腦補假英文）",
       "source": "取得途徑（商城購買、副本掉落、NPC兌換等）",
-      "dye": "染色設定（如：砲鋼黑染劑 或 未染色）"
+      "dye": "染色設定（照抄卡片上的色號名稱，如 シェールブラウン、Kobold Brown、素雪白 或 未染色）"
     }
   ]
 }`;
@@ -2214,6 +2214,106 @@
   }
   // === [SECTION: JS_EQUIPMENT_RESOLVER] END ===
 
+
+  // ==============================================================================
+  // === [SECTION: JS_OFFICIAL_DYE_TRANSLATOR] START ===
+  // ==============================================================================
+  // 官方全量 147+ 染劑繁體中文化對照庫 (源自 ffxiv-datamining-mixed ItemUICategory == 55)
+  const COMPACT_OFFICIAL_DYES = [["松節油","Terebinth","テレビン油"],["素雪白染劑","Snow White","スノウホワイト"],["蒼白灰染劑","Ash Grey","アッシュグレイ"],["古菩灰染劑","Goobbue Grey","グゥーブーグレイ"],["石板灰染劑","Slate Grey","スレートグレイ"],["木炭灰染劑","Charcoal Grey","チャコールグレイ"],["煤煙黑染劑","Soot Black","スートブラック"],["玫瑰粉染劑","Rose Pink","ローズピンク"],["丁香紫染劑","Lilac Purple","ライラックパープル"],["羅蘭莓染劑","Rolanberry Red","ロランベリーレッド"],["衛月紅染劑","Dalamud Red","ダラガブレッド"],["鐵銹紅染劑","Rust Red","ラストレッド"],["果酒紅染劑","Wine Red","ワインレッド"],["珊瑚粉染劑","Coral Pink","コーラルピンク"],["鮮血紅染劑","Blood Red","ブラッドレッド"],["鮭魚粉染劑","Salmon Pink","サーモンピンク"],["日落橙染劑","Sunset Orange","サンセットオレンジ"],["台地紅染劑","Mesa Red","メサレッド"],["樹皮棕染劑","Bark Brown","バークブラウン"],["巧克力染劑","Chocolate Brown","チョコレートブラウン"],["鐵銹棕染劑","Russet Brown","ラセットブラウン"],["鈷鐵棕染劑","Kobold Brown","コボルドブラウン"],["軟木棕染劑","Cork Brown","コルクブラウン"],["盧恩棕染劑","Qiqirn Brown","キキルンブラウン"],["奧猴棕染劑","Opo-opo Brown","オポオポブラウン"],["山羊棕染劑","Aldgoat Brown","アルドゴートブラウン"],["南瓜橙染劑","Pumpkin Orange","パンプキンオレンジ"],["橡果棕染劑","Acorn Brown","エーコンブラウン"],["果園棕染劑","Orchard Brown","オーチャードブラウン"],["山栗棕染劑","Chestnut Brown","チェスナットブラウン"],["哥布林染劑","Gobbiebag Brown","ゴブリンブラウン"],["頁岩棕染劑","Shale Brown","シェールブラウン"],["鼴鼠棕染劑","Mole Brown","モールブラウン"],["沃土棕染劑","Loam Brown","ロームブラウン"],["骸骨白染劑","Bone White","ボーンホワイト"],["黃沙棕染劑","Ul Brown","ウルダハンブラウン"],["沙漠黃染劑","Desert Yellow","デザートイエロー"],["蜂蜜黃染劑","Honey Yellow","ハニーイエロー"],["玉米黃染劑","Millioncorn Yellow","ミリオンコーンイエロー"],["猛豹黃染劑","Coeurl Yellow","クァールイエロー"],["奶油黃染劑","Cream Yellow","クリームイエロー"],["日影黃染劑","Halatali Yellow","ハラタリイエロー"],["葡萄乾棕染劑","Raisin Brown","レーズンブラウン"],["泥沼綠染劑","Mud Green","マッドグリーン"],["妖精綠染劑","Sylph Green","シルフグリーン"],["青檸綠染劑","Lime Green","ライムグリーン"],["苔蘚綠染劑","Moss Green","モスグリーン"],["牧草綠染劑","Meadow Green","メドウグリーン"],["橄欖綠染劑","Olive Green","オリーヴグリーン"],["沼澤綠染劑","Marsh Green","マーシュグリーン"],["蘋果綠染劑","Apple Green","アップルグリーン"],["仙人掌染劑","Cactuar Green","サボテンダーグリーン"],["獵人綠染劑","Hunter Green","ハンターグリーン"],["口花綠染劑","Ochu Green","オチューグリーン"],["金龜綠染劑","Adamantoise Green","アダマンタスグリーン"],["地神綠染劑","Nophica Green","ノフィカグリーン"],["深林綠染劑","Deepwood Green","ディープウッドグリーン"],["天上藍染劑","Celeste Green","セレストグリーン"],["綠松藍染劑","Turquoise Green","ターコイズグリーン"],["魔花綠染劑","Morbol Green","モルボルグリーン"],["寒冰藍染劑","Ice Blue","アイスブルー"],["天空藍染劑","Sky Blue","スカイブルー"],["海霧藍染劑","Seafog Blue","シーフォグブルー"],["孔雀藍染劑","Peacock Blue","ピーコックブルー"],["羅海藍染劑","Rhotano Blue","ロータノブルー"],["腐屍藍染劑","Corpse Blue","コープスブルー"],["青磷藍染劑","Ceruleum Blue","セルレアムブルー"],["靛青藍染劑","Woad Blue","ウォードブルー"],["油墨藍染劑","Ink Blue","インクブルー"],["盜龍藍染劑","Raptor Blue","ラプトルブルー"],["東洲藍染劑","Othard Blue","オサードブルー"],["風暴藍染劑","Storm Blue","ストームブルー"],["虛空藍染劑","Void Blue","ヴォイドブルー"],["皇室藍染劑","Royal Blue","ロイヤルブルー"],["午夜藍染劑","Midnight Blue","ミッドナイトブルー"],["陰影藍染劑","Shadow Blue","シャドウブルー"],["深淵藍染劑","Abyssal Blue","アビサルブルー"],["薰衣草染劑","Lavender Purple","ラベンダーブルー"],["憂鬱紫染劑","Gloom Purple","グルームパープル"],["醋栗紫染劑","Currant Purple","カラントパープル"],["鳶尾紫染劑","Iris Purple","アイリスパープル"],["葡萄紫染劑","Grape Purple","グレープパープル"],["蓮花粉染劑","Lotus Pink","ロータスピンク"],["蜂鳥粉染劑","Colibri Pink","コリブリピンク"],["仙子梅染劑","Plum Purple","プラムパープル"],["帝王紫染劑","Regal Purple","リーガルパープル"],["生漆","Raw Urushi","生漆"],["黑漆","Black Urushi","黒漆"],["特製無瑕白染劑","Pure White","ピュアホワイトEX"],["特製煤玉黑染劑","Jet Black","ジェットブラックEX"],["特製柔彩粉染劑","Pastel Pink","パステルピンクEX"],["特製黑暗紅染劑","Dark Red","ダークレッドEX"],["特製黑暗棕染劑","Dark Brown","ダークブラウンEX"],["特製柔彩綠染劑","Pastel Green","パステルグリーンEX"],["特製黑暗綠染劑","Dark Green","ダークグリーンEX"],["特製柔彩藍染劑","Pastel Blue","パステルブルーEX"],["特製黑暗藍染劑","Dark Blue","ダークブルーEX"],["特製柔彩紫染劑","Pastel Purple","パステルパープルEX"],["特製黑暗紫染劑","Dark Purple","ダークパープルEX"],["特製閃耀銀染劑","Metallic Silver","シャインシルバーEX"],["特製閃耀金染劑","Metallic Gold","シャインゴールドEX"],["特製金屬紅染劑","Metallic Red","メタリックレッドEX"],["特製金屬橙染劑","Metallic Orange","メタリックオレンジEX"],["特製金屬黃染劑","Metallic Yellow","メタリックイエローEX"],["特製金屬綠染劑","Metallic Green","メタリックグリーンEX"],["特製金屬藍染劑","Metallic Sky Blue","メタリックスカイブルーEX"],["特製金屬靛染劑","Metallic Blue","メタリックブルーEX"],["特製金屬紫染劑","Metallic Purple","メタリックパープルEX"],["無瑕白染劑","Pure White","ピュアホワイト"],["煤玉黑染劑","Jet Black","ジェットブラック"],["閃耀銀染劑","Metallic Silver","シャインシルバー"],["閃耀金染劑","Metallic Gold","シャインゴールド"],["柔彩粉染劑","Pastel Pink","パステルピンク"],["黑暗紅染劑","Dark Red","ダークレッド"],["黑暗棕染劑","Dark Brown","ダークブラウン"],["柔彩綠染劑","Pastel Green","パステルグリーン"],["黑暗綠染劑","Dark Green","ダークグリーン"],["柔彩藍染劑","Pastel Blue","パステルブルー"],["黑暗藍染劑","Dark Blue","ダークブルー"],["柔彩紫染劑","Pastel Purple","パステルパープル"],["黑暗紫染劑","Dark Purple","ダークパープル"],["金屬紅染劑","Metallic Red","メタリックレッド"],["金屬橙染劑","Metallic Orange","メタリックオレンジ"],["金屬黃染劑","Metallic Yellow","メタリックイエロー"],["金屬綠染劑","Metallic Green","メタリックグリーン"],["金屬藍染劑","Metallic Sky Blue","メタリックスカイブルー"],["金屬靛染劑","Metallic Blue","メタリックブルー"],["金屬紫染劑","Metallic Purple","メタリックパープル"],["寶石紅染劑","Ruby Red","ルビーレッド"],["櫻桃粉染劑","Cherry Pink","チェリーピンク"],["絲雀黃染劑","Canary Yellow","カナリーイエロー"],["香草黃染劑","Vanilla Yellow","バニライエロー"],["龍騎藍染劑","Dragoon Blue","ドラグーンブルー"],["松石藍染劑","Turquoise Blue","ターコイズブルー"],["砲銅黑染劑","Gunmetal Black","ガンメタル"],["珍珠白染劑","Pearl White","パールホワイト"],["金屬銅染劑","Metallic Brass","シャインブラス"],["霓虹粉染劑","Neon Pink","ネオンピンク"],["明亮橙染劑","Bright Orange","ブライトオレンジ"],["霓虹綠染劑","Neon Green","ネオングリーン"],["霓虹黃染劑","Neon Yellow","ネオンイエロー"],["羅蘭紫染劑","Violet Purple","バイオレットパープル"],["碧空藍染劑","Azure Blue","アズールブルー"],["金屬粉染劑","Metallic Pink","メタリックピンク"],["金屬寶石紅染劑","Metallic Ruby Red","メタリックルビーレッド"],["金屬鈷鐵綠染劑","Metallic Cobalt Green","メタリックコバルトグリーン"],["金屬黑暗藍染劑","Metallic Dark Blue","メタリックダークブルー"],["胭脂紅染劑","Carmine Red","カーマインレッド"],["通用染劑","Standard Spectrum","ノーマルカラー"],["追加染劑1","Wide Spectrum #1","アディショナルカラー1"],["追加染劑2","Wide Spectrum #2","アディショナルカラー2"]];
+
+  const DYE_LOOKUP_MAP = new Map();
+  function initOfficialDyeLookup() {
+    COMPACT_OFFICIAL_DYES.forEach(([zh, en, ja]) => {
+      const zhShort = zh.replace('染劑', '').replace('特製', '');
+      const zhTargets = [
+        zh, zhShort,
+        zh.toLowerCase(), zhShort.toLowerCase(),
+        zh.replace('砲', '炮'), zhShort.replace('砲', '炮'),
+        zh.replace('炮', '砲'), zhShort.replace('炮', '砲')
+      ];
+      zhTargets.forEach(k => { if (k) DYE_LOOKUP_MAP.set(k, zh); });
+
+      if (en) {
+        const enLower = en.toLowerCase().trim();
+        DYE_LOOKUP_MAP.set(enLower, zh);
+        DYE_LOOKUP_MAP.set(enLower + ' dye', zh);
+        const enClean = enLower.replace(/^general-purpose\s+/, '').replace(/^special\s+/, '');
+        DYE_LOOKUP_MAP.set(enClean, zh);
+        DYE_LOOKUP_MAP.set(enClean + ' dye', zh);
+      }
+
+      if (ja) {
+        const jaClean = ja.replace(/^カララント:/, '').trim();
+        DYE_LOOKUP_MAP.set(jaClean, zh);
+        DYE_LOOKUP_MAP.set(jaClean.replace(/EX$/, ''), zh);
+        if (jaClean.includes('ヴ')) DYE_LOOKUP_MAP.set(jaClean.replace(/ヴ/g, 'ブ'), zh);
+        if (jaClean.includes('ブ')) DYE_LOOKUP_MAP.set(jaClean.replace(/ブ/g, 'ヴ'), zh);
+      }
+    });
+
+    const emptyVals = ['未染色', '無染色', 'なし', 'none', '-', '/', '未染', '無', 'nil', 'null'];
+    emptyVals.forEach(k => DYE_LOOKUP_MAP.set(k, '未染色'));
+  }
+  initOfficialDyeLookup();
+
+  function lookupSingleOfficialDye(str) {
+    if (!str) return null;
+    const s = str.trim();
+    if (DYE_LOOKUP_MAP.has(s)) return DYE_LOOKUP_MAP.get(s);
+    if (DYE_LOOKUP_MAP.has(s.toLowerCase())) return DYE_LOOKUP_MAP.get(s.toLowerCase());
+    return null;
+  }
+
+  function translateSingleDyePart(part) {
+    part = (part || '').trim();
+    if (!part) return '';
+
+    let prefix = '';
+    const prefixMatch = part.match(/^([①②③④⑤\d]+[:\.\s\-]*)(.*)$/);
+    if (prefixMatch && ['①', '②', '1', '2', '1:', '2:', '1.', '2.', '#1', '#2'].includes(prefixMatch[1].trim())) {
+      prefix = prefixMatch[1];
+      part = prefixMatch[2].trim();
+    }
+
+    // 括號拆解：例如 "シェールブラウン (Shale Brown)" 或 "Shale Brown (シェールブラウン)"
+    const parenMatch = part.match(/^(.*?)\s*[\(\uff08]([^\)\uff09]+)[\)\uff09]$/);
+    if (parenMatch) {
+      const mainPart = parenMatch[1].trim();
+      const subPart = parenMatch[2].trim();
+      const mainTrans = lookupSingleOfficialDye(mainPart);
+      const subTrans = lookupSingleOfficialDye(subPart);
+      const zh = mainTrans || subTrans;
+      if (zh) {
+        if (zh === '未染色') return `${prefix}未染色`;
+        const orig = (zh !== subPart) ? subPart : mainPart;
+        return (orig && orig !== zh) ? `${prefix}${zh} (${orig})` : `${prefix}${zh}`;
+      }
+    }
+
+    const direct = lookupSingleOfficialDye(part);
+    if (direct) {
+      if (direct === '未染色') return `${prefix}未染色`;
+      const isCardNonZh = /[\u3040-\u30ff]/.test(part) || /^[A-Za-z0-9\s\'\._-]+$/.test(part);
+      return isCardNonZh ? `${prefix}${direct} (${part})` : `${prefix}${direct}`;
+    }
+
+    return `${prefix}${part}`;
+  }
+
+  // 染色設定智慧中文化轉換器（支援 7.0 雙染色通道 ① / ② 與多種分隔符號）
+  function translateDyeSetting(raw) {
+    if (!raw || !String(raw).trim()) return '未染色';
+    const s = String(raw).trim();
+    if (['none', 'なし', '-', '无', '無', '未染色', '無染色', 'nil', 'null'].includes(s.toLowerCase())) {
+      return '未染色';
+    }
+    const parts = s.split(/[/、&\n]+/);
+    const translated = parts.map(translateSingleDyePart).filter(Boolean);
+    return translated.length > 0 ? translated.join(' / ') : '未染色';
+  }
+  // === [SECTION: JS_OFFICIAL_DYE_TRANSLATOR] END ===
+
+
   // ==============================================================================
   // === [SECTION: JS_UI_RENDER_EXPORT] START ===
   // ==============================================================================
@@ -2272,7 +2372,7 @@
           ${subNameHtml}
         </td>
         <td>${sourceHtml}</td>
-        <td><span class="dye-tag">${escapeHtml(item.dye)}</span></td>
+        <td><span class="dye-tag">${escapeHtml(translateDyeSetting(item.dye || item.dye_setting || ""))}</span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -2302,7 +2402,7 @@
       const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
       const sourceInfo = resolveEquipmentSource(it);
       const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（AI判讀，詳細請點進灰機）`;
-      lines.push([it.slot, gearName, subName, finalSource, it.dye, wikiInfo.url].join("\t"));
+      lines.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].join("\t"));
     });
     if (currentOutfitData.note) {
       lines.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].join("\t"));
@@ -2329,7 +2429,7 @@
       const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
       const sourceInfo = resolveEquipmentSource(it);
       const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（AI判讀，詳細請點進灰機）`;
-      csvRows.push([it.slot, gearName, subName, finalSource, it.dye, wikiInfo.url].map(escapeCsv).join(","));
+      csvRows.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].map(escapeCsv).join(","));
     });
     
     if (currentOutfitData.note) {
@@ -2359,7 +2459,7 @@
       lines.push(`• [${it.slot}] ${gearName}`);
       if (subName) lines.push(`  原名：${subName}`);
       lines.push(`  來源：${finalSource}`);
-      lines.push(`  染色：${it.dye}`);
+      lines.push(`  染色：${translateDyeSetting(it.dye || it.dye_setting || "")}`);
       lines.push(`  灰機：${wikiInfo.url}`);
       lines.push("");
     });
