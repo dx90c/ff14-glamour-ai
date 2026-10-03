@@ -858,13 +858,13 @@
       <h3>📦 官方裝備資料庫管理 (V2)</h3>
     </div>
     <div class="modal-body">
-      <p style="margin-bottom: 12px;">本工具內建輕量化裝備條目字典。當遊戲大改版推出新外觀時，可透過此處<b>一鍵同步開源數據庫</b>，永久儲存在本機瀏覽器中。</p>
+      <p style="margin-bottom: 12px;">本工具已預先收錄 14 萬筆官方中英日完整裝備字典（開箱即用免手動下載）。未來遊戲大改版推出新外觀時，亦可透過此處隨時<b>一鍵同步開源數據庫</b>，永久儲存在本機瀏覽器中。</p>
 
       <!-- Database Status Card -->
       <div class="db-info-card">
         <div class="db-status-row">
           <span><b>當前本地版本：</b></span>
-          <span class="status-badge green" id="localVersionBadge">內建核心字典 (Patch 7.05+)</span>
+          <span class="status-badge green" id="localVersionBadge">內建官方完整庫 (Patch 7.05+)</span>
         </div>
         <div class="db-status-row">
           <span><b>雲端最新版本：</b></span>
@@ -872,7 +872,7 @@
         </div>
         <div class="db-status-row">
           <span><b>收錄外觀條目：</b></span>
-          <span id="itemCountLabel">43+ 核心經典裝備 + 全名直連</span>
+          <span id="itemCountLabel">載入中...</span>
         </div>
       </div>
 
@@ -880,7 +880,7 @@
       <div class="source-box">
         <b>🌐 公開開源數據來源（透明披露，安心查驗）：</b><br>
         • 主來源庫：<a href="https://github.com/InfSein/ffxiv-datamining-mixed" target="_blank">InfSein/ffxiv-datamining-mixed (GitHub)</a><br>
-        • 數據檔案：<code>chs/Item.csv</code> 與 <code>en/Item.csv</code><br>
+        • 數據檔案：<code>chs/Item.csv</code>、<code>en/Item.csv</code>、<code>ja/Item.csv</code>（中英日三語全對照）<br>
         • 備用社群：<a href="https://github.com/thewakingsands/ffxiv-datamining-cn" target="_blank">拂曉之血 (The Waking Sands) 開源數據庫</a><br>
         <span style="font-size:0.78rem; color:#7f8c8d; margin-top:4px; display:block;">
           🛡️ 安全聲明：本工具僅自上述開源倉庫讀取中英日名稱對照，絕無任何惡意代碼，所有運算皆在您的本機瀏覽器內執行。
@@ -1022,6 +1022,7 @@
     setupDropZone();
     setupClipboardPaste();
     await loadDatabaseFromIDB();
+    await loadPrebuiltDatabaseIfEmpty();
     initDatabaseState();
     checkRemoteVersionSilently();
     if (!getApiKey()) {
@@ -1199,6 +1200,27 @@
     }
   }
 
+  async function loadPrebuiltDatabaseIfEmpty() {
+    if (cachedCustomDb && cachedCustomDb.items && Object.keys(cachedCustomDb.items).length > 1000) {
+      return cachedCustomDb;
+    }
+    try {
+      const resp = await fetch('./ff14_items.json');
+      if (resp.ok) {
+        const prebuilt = await resp.json();
+        if (prebuilt && prebuilt.items && Object.keys(prebuilt.items).length > 0) {
+          await saveDatabaseToIDB(prebuilt);
+          cachedCustomDb = prebuilt;
+          initDatabaseState();
+          return prebuilt;
+        }
+      }
+    } catch (e) {
+      console.log("內建完整資料庫載入略過（本地檔案協定或離線模式）：", e);
+    }
+    return null;
+  }
+
   function getCustomDatabase() {
     return cachedCustomDb;
   }
@@ -1209,10 +1231,16 @@
     const dbBtnLabel = document.getElementById("dbBtnLabel");
     const itemCountLabel = document.getElementById("itemCountLabel");
 
-    if (customDb && customDb.version) {
+    if (customDb && customDb.version && customDb.items && Object.keys(customDb.items).length > 1000) {
+      const count = Object.keys(customDb.items).length;
+      localBadge.innerText = `已就緒: ${customDb.version.label || "官方完整庫"}`;
+      localBadge.className = "status-badge green";
+      dbBtnLabel.innerText = `📦 裝備庫: 官方完整版 (${(count/10000).toFixed(1)}萬筆)`;
+      itemCountLabel.innerText = `已收錄 ${count.toLocaleString()} 筆中英日對照`;
+    } else if (customDb && customDb.version) {
       localBadge.innerText = `已同步: ${customDb.version.label || customDb.version.sha}`;
       localBadge.className = "status-badge green";
-      dbBtnLabel.innerText = `裝備庫: ${customDb.version.label || "最新版"}`;
+      dbBtnLabel.innerText = `裝備庫: ${customDb.version.label || "自訂版"}`;
       itemCountLabel.innerText = `已收錄 ${Object.keys(customDb.items || {}).length} 筆裝備對照`;
     } else {
       localBadge.innerText = BUILTIN_VERSION.label;
@@ -1254,9 +1282,10 @@
       // 檢查本機版本是否落後
       const customDb = getCustomDatabase();
       const currentSha = customDb?.version?.sha || BUILTIN_VERSION.sha;
+      const hasFullDb = customDb && customDb.items && Object.keys(customDb.items).length > 1000;
 
-      if (currentSha !== remoteSha) {
-        // 發現新版本！
+      if (currentSha !== remoteSha && !hasFullDb) {
+        // 發現新版本且尚未載入完整庫！
         remoteBadge.className = "status-badge orange";
         document.getElementById("dbBtn").classList.add("sync-alert");
         
@@ -1497,7 +1526,7 @@
   }
 
   async function resetToDefaultDb() {
-    if (confirm("確定要清除自訂同步數據，恢復為出廠預設字典嗎？")) {
+    if (confirm("確定要重設裝備數據庫，恢復為預設完整字典嗎？")) {
       try {
         const db = await openItemDatabase();
         const tx = db.transaction(IDB_STORE, "readwrite");
@@ -1505,8 +1534,9 @@
       } catch (e) {}
       localStorage.removeItem("ff14_custom_items_dict");
       cachedCustomDb = null;
+      await loadPrebuiltDatabaseIfEmpty();
       initDatabaseState();
-      showToast("已恢復為出廠預設字典");
+      showToast("✅ 已成功重設為官方完整裝備字典！");
     }
   }
 
