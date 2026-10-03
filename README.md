@@ -4,7 +4,8 @@
 > **線下單檔使用**：[FF14外觀AI辨識小工具v2.1.1.html](https://github.com/dx90c/ff14-glamour-ai/blob/main/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7v2.1.1.html)
 
 本工具專門用來將推特（Twitter / X）、Eorzea Collection、光之幻化館等玩家分享的「帶有裝備名稱的幻化圖片」，透過視覺 AI 自動辨識並整理成結構化表格，列出各部位裝備名稱、染色色號、取得途徑，並提供灰機 wiki 直達連結，方便光之戰士們快速查閱、收集外觀與學習優秀穿搭！
-**由Gemini 3.8 flash製作
+
+**由Gemini 3.8 flash製作**
 ---
 
 ## 📖 使用教學
