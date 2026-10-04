@@ -1,50 +1,43 @@
-# 👗 FF14 幻化外觀 AI 辨識小工具 (FF14 Glamour AI Recognizer)
+# FF14 幻化外觀 AI 辨識小工具 · 2.3.0
 
-> **線上免安裝版**：[https://dx90c.github.io/ff14-glamour-ai/](https://dx90c.github.io/ff14-glamour-ai/)
-> **線下單檔使用**：[FF14外觀AI辨識小工具v2.1.1.html](https://github.com/dx90c/ff14-glamour-ai/blob/main/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7v2.1.1.html)
+[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載 HTML](https://dx90c.github.io/ff14-glamour-ai/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7.html) · [下載裝備庫](https://dx90c.github.io/ff14-glamour-ai/ff14_database.json)
 
-本工具專門用來將推特（Twitter / X）、Eorzea Collection、光之幻化館等玩家分享的「帶有裝備名稱的幻化圖片」，透過視覺 AI 自動辨識並整理成結構化表格，列出各部位裝備名稱、染色色號、取得途徑，並提供灰機 wiki 直達連結，方便光之戰士們快速查閱、收集外觀與學習優秀穿搭！
+讀取附有裝備名稱的穿搭圖片，整理裝備、染色與取得方式，提供灰機與 Google 連結，以及剪貼簿、CSV、TXT 匯出。
 
-> **由Gemini 3.8 flash製作**
----
+## 使用
 
-## 📖 使用教學
+1. 設定自己的 Gemini、OpenAI 或 OpenAI 相容服務 API Key。服務額度與費用依供應商而定。
+2. 貼上、拖入或選擇穿搭圖片。
+3. 查看結果；「疑似匹配」表示系統自動猜測的裝備，請留意名稱。
 
-### 1. 取得免費 API Key（以 Google Gemini 為例）
-本工具需連接視覺 AI 模型讀圖，推薦使用 Google 提供的免費額度（日常辨識完全夠用，不需付費）：
-1. 前往 [Google AI Studio](https://aistudio.google.com/)。
-2. 登入 Google 帳號，點選左上角 **「Get API key」** ➔ **「Create API key」**。
-3. 複製產生的金鑰（以 `AIzaSy...` 開頭）。
-(亦支援 OpenAI 的 `gpt-4o-mini` 或 OpenRouter / 自訂相容接口，可依個人偏好在網頁中切換)
+網頁版第一次自動讀取裝備庫並保存於瀏覽器。下載版使用兩個檔案：FF14外觀AI辨識小工具.html 與 ff14_database.json；雙擊 HTML 後在裝備庫視窗首次匯入 JSON。辨識圖片、同步及灰機預查需要網路，名稱比對可離線執行。
 
-### 2. 設定金鑰
-打開網頁 [https://dx90c.github.io/ff14-glamour-ai/](https://dx90c.github.io/ff14-glamour-ai/) ，在右上角點擊 **「🔑 設定 API Key」**，貼上金鑰並點選儲存。金鑰僅儲存在您的本機瀏覽器中。
+遊戲改版後按「一鍵同步庫」。三庫分別檢查，已最新的庫不重新下載，失敗後再次按同一顆按鈕即可重試。下載版首次同步需選擇 HTML 所在資料夾，之後自動保存 JSON；此功能需要瀏覽器支援資料夾寫入與授權。網頁版直接保存瀏覽器，不要求本機資料夾。
 
-### 3. 匯入穿搭圖片
-* **在推特或網頁上看到穿搭圖，下載後，貼在網頁畫面上，即可自動觸發辨識。
+## 資料來源
 
-### 4. 查詢條目與整理
-* **灰機 wiki 物品直達**：點選裝備名稱或 **`[✨ 灰機好手氣]`** / **`[🔗 灰機wiki]`**，會自動開啟灰機 wiki 的官方物品攻略頁。卡片上的英文、日文或繁體中文都會自動查詢對應條目。
-* **一鍵複製到 Excel**：點選下方的 **「📋 複製到剪貼簿 (Excel格式)」**，可直接在 Excel 表格內按 `Ctrl + V` 貼上整理自己的外觀清單。
-* **下載 CSV / TXT**：支援帶 BOM 的繁中 CSV 下載（Windows Excel 打開不亂碼）與純文字穿搭筆記。
+- 主庫：[InfSein](https://github.com/InfSein/ffxiv-datamining-mixed)：五語名稱。
+- 來源庫：[Teamcraft](https://github.com/ffxiv-teamcraft/ffxiv-teamcraft)：繁中名稱及取得方式（MIT）。
+- 副庫：[LuminaSupplemental](https://github.com/Critical-Impact/LuminaSupplemental)：補充取得方式（GPL-3.0）。
+- 字形輔助：[OpenCC](https://github.com/BYVoid/OpenCC)：相关字形表（Apache-2.0，授權全文在 HTML）。
 
----
+目前隨附 JSON 有 29,338 件裝備、24,971 件支援的來源記錄；不保證全部名稱或來源都齊全。上游版本與授權保存在 JSON。Teamcraft 的「補丁索引至」不代表取得方式完整覆蓋該遊戲版本。
 
-## 📦 數據庫來源說明
-網頁工具已預先收錄 14 萬筆中英日完整裝備字典，數據來源引用自開源社群維護的官方數據挖掘庫：
-* GitHub 倉庫：[InfSein/ffxiv-datamining-mixed](https://github.com/InfSein/ffxiv-datamining-mixed)
-* 版本號 Unpack 7.56#hf2
+精準匹配優先，其次以簡繁字形、相似字權重與長名稱最多兩字差異自動猜測；候選不明確時查灰機。來源按候選物品 ID 查現成資料，不由名稱前綴或 AI 猜來源。灰機預查可能受 Cloudflare 或跨域限制，失敗保留站內搜尋。
 
-平日正常使用無須進行任何設定；當未來遊戲大改版（如新 Patch 推出）時，線下版本亦可隨時一鍵同步最新開源裝備庫。
+## 隱私與維護
 
----
+金鑰儲存在本機瀏覽器；圖片送至你選擇的 AI 服務商，資料庫由公開 GitHub 取得。請勿分享含有私人金鑰的瀏覽器資料。
 
-## 🔒 隱私與安全性說明
-* **無後端、不存金鑰**：本專案為 GitHub Pages 純靜態網頁，技術上沒有任何後端伺服器或資料庫可以記錄使用者的 API Key。所有的識別請求皆由您的瀏覽器直接連線至官方 API（Google / OpenAI）。
-* **隨時可驗證**：隨時可以按 `F12` 查看 `Network` 封包，確認沒有任何封包發送至第三方伺服器。
-* **本機離線執行**：如果您對線上網頁仍有疑慮，可以直接下載獨立單檔 [FF14外觀AI辨識小工具v2.1.1.html](https://github.com/dx90c/ff14-glamour-ai/blob/main/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7v2.1.1.html) 到您的電腦本機，在完全斷網或離線環境下雙擊開啟使用。
+固定更新 index.html、FF14外觀AI辨識小工具.html 與 ff14_database.json，舊版位於 old。[update 2.3.0 改進項目](CHANGELOG.md)。HTML 保留 SECTION 分組，便於定位維護。
 
----
+## 程式驗證
 
-## 📜 開源協議
-本專案採 [MIT License](LICENSE) 開源。遊戲版權與相關素材商標屬於 SQUARE ENIX CO., LTD. 所有。
+在專案根目錄執行 Node：
+
+```sh
+node tests/regression.cjs
+node tests/regression.cjs index.html
+```
+
+測試使用本機 JSON 與模擬連線，不呼叫付費 AI；實際服務端可用性與瀏覽器權限仍依環境而定。

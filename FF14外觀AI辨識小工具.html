@@ -792,8 +792,6 @@
         <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.3.0版</span></h1>
       </div>
       <div class="header-actions">
-        <a class="header-btn" href="./FF14外觀AI辨識小工具.html" download>⬇ 下載 HTML</a>
-        <a class="header-btn" href="./ff14_database.json" download>⬇ 下載裝備庫</a>
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
            <span id="dbBtnLabel">裝備庫: 官方同步</span>
         </button>
@@ -1364,7 +1362,6 @@
     });
   }
   async function prepareDatabaseDirectory() {
-    if (location.protocol !== 'file:') return;
     if (!window.showDirectoryPicker) throw new Error('此瀏覽器不支援資料夾寫入，請用 Chrome 或 Edge 開啟，或直接匯入現有 JSON。');
     databaseDirectory ||= await directoryStore();
     if (databaseDirectory && await databaseDirectory.queryPermission({mode:'readwrite'}) !== 'granted') {
@@ -1376,7 +1373,6 @@
     }
   }
   async function saveDatabaseFile(db) {
-    if (location.protocol !== 'file:') return '資料庫已保存瀏覽器。';
     try {
       const file = await databaseDirectory.getFileHandle('ff14_database.json',{create:true});
       const writer = await file.createWritable();
