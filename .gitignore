@@ -6,10 +6,8 @@ api_key.txt
 
 # 本機 Excel 田地與試算表（個人資料庫保護）
 *.xlsx
-
 # 本機測試副本（正式下載版使用固定檔名並納入版本控制）
 FF14外觀AI辨識小工具 (2).html
-
 # 暫存與快取目錄
 __pycache__/
 *.py[cod]
@@ -19,8 +17,9 @@ temp/
 tmp/
 .vscode/
 .idea/
-
 # 作業系統暫存檔
 Thumbs.db
 Desktop.ini
 .DS_Store
+ocr-src/node_modules/
+ocr-src/release-ocr/

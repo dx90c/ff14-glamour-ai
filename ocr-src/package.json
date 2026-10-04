@@ -1,0 +1,1 @@
+{"name":"ff14-paddleocr-test","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1 --port 5174","build":"vite build"},"dependencies":{"@paddleocr/paddleocr-js":"0.4.2"},"devDependencies":{"vite":"^7.0.0"}}

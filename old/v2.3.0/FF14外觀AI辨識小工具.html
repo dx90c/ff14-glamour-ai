@@ -1,0 +1,2780 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+【FF14 幻化外觀 AI 辨識小工具 - 架構導航索引 / AI NAVIGATION MAP】
+維護或修改程式碼時，請優先定位以下標準化錨點標籤 [SECTION: ...]，避免全檔盲目檢索：
+
+1. [SECTION: CSS_STYLES]
+   - 主題色彩變數 (:root)、版面配置、卡片元件、按鈕、表格、控制台與彈窗樣式。
+2. [SECTION: HTML_DOM]
+   - 頂部導航列 (Header)、版本通知橫幅、上傳拖曳區 (DropZone)、載入狀態與即時日誌視窗。
+   - 辨識結果展示區 (ResultGrid, Table, ImagePreview)。
+   - 彈出視窗：裝備庫同步管理彈窗 (#dbModal)、API Key 與 AI 服務商設定彈窗 (#keyModal)。
+3. [SECTION: JS_GLOBAL_STATE]
+   - 全域變數 (currentOutfitData, currentImageBase64 等)、版本號設定 (BUILTIN_VERSION)。
+4. [SECTION: JS_PROVIDER_CONFIG]
+   - 多模型金鑰與服務商管理 (Gemini / OpenAI / 自訂 OpenRouter)、Modal 開關與 UI 同步。
+5. [SECTION: JS_INDEXEDDB_CACHE]
+   - IndexedDB 高速儲存引擎 (FF14_GLAMOUR_DB_V220)、自訂字典讀寫與重置。
+6. [SECTION: JS_SYNC_ENGINE]
+   - GitHub 固定 commit 下載、多語物品 ID 索引、CSV 欄位解析、社群取得方式、JSON 匯入與匯出。
+7. [SECTION: JS_UPLOAD_HANDLERS]
+   - 檔案選擇、拖放 (Drag & Drop) 監聽、剪貼簿圖片自動貼上 (Paste) 處理。
+8. [SECTION: JS_AI_DISPATCHER]
+   - 統一系統 Prompt (getUnifiedSystemPrompt)、各 AI 介面調度 (Gemini API 輪詢重試 / OpenAI 相容介面)。
+9. [SECTION: JS_EQUIPMENT_RESOLVER]
+   - 多語精確匹配、同名衝突處理、灰機預查與零筆轉鴨鴨；查詢失敗保留站內搜尋。
+10. [SECTION: JS_TEAMCRAFT_DATABASE]
+    - Teamcraft JSON 固定版本下載、精確 ID 對接、繁中名稱、任務／製作／兌換／物品箱來源。
+11. [SECTION: JS_UI_RENDER_EXPORT]
+    - 辨識結果渲染 (renderResult)、一鍵複製至 Excel、下載 CSV (含 UTF-8 BOM) 與 TXT 筆記匯出。
+================================================================================
+-->
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FF14 幻化外觀 AI 辨識小工具 v2.3.0</title>
+  <style>
+    /* === [SECTION: CSS_STYLES] START === */
+    :root {
+      --primary: #2c3e50;
+      --primary-light: #34495e;
+      --accent: #2980b9;
+      --accent-hover: #1f618d;
+      --bg: #f4f6f9;
+      --card-bg: #ffffff;
+      --text-main: #2c3e50;
+      --text-muted: #7f8c8d;
+      --border: #dcdde1;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+      --purple: #8e44ad;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "微軟正黑體", sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 24px 16px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header (Point 4: 鎖定右上按鈕排版，說明獨立第二行) */
+    header {
+      background: linear-gradient(135deg, #1b2631, #2c3e50);
+      color: #fff;
+      padding: 22px 28px 18px;
+      border-radius: 14px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      margin-bottom: 20px;
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-title h1 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .v2-badge {
+      background: linear-gradient(135deg, #e67e22, #d35400);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 6px rgba(230, 126, 34, 0.4);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .header-subtext {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      color: #bdc3c7;
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .header-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .header-btn.sync-alert {
+      background: #e67e22;
+      border-color: #d35400;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(230, 126, 34, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(230, 126, 34, 0); }
+    }
+
+    /* Version Notice Banner */
+    .version-banner {
+      display: none;
+      background: #fef9e7;
+      border: 1px solid #f9e79f;
+      border-left: 5px solid #f39c12;
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      font-size: 0.92rem;
+      color: #7d6608;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    .version-banner-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .version-banner-btn {
+      background: #f39c12;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .version-banner-btn:hover {
+      background: #d68910;
+    }
+
+    /* Upload Area */
+    .upload-card {
+      background: var(--card-bg);
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    .upload-card:hover, .upload-card.dragover {
+      border-color: var(--accent);
+      background: #ebf5fb;
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .upload-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .upload-hint {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    /* Modals */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+    }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 14px;
+      max-width: 600px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
+      animation: popIn 0.25s ease-out;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.93); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header h3 {
+      font-size: 1.3rem;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-body {
+      font-size: 0.92rem;
+      color: #444;
+      line-height: 1.6;
+    }
+
+    .step-box {
+      background: #f8f9fa;
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 4px;
+    }
+
+    .step-box ol {
+      margin-left: 20px;
+      margin-top: 6px;
+    }
+
+    .step-box li {
+      margin-bottom: 4px;
+    }
+
+    .input-group {
+      margin-top: 14px;
+    }
+
+    .input-group label {
+      display: block;
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 6px;
+      color: #333;
+    }
+
+    .input-group input, .input-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    .modal-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 24px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    #dbModal .db-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    #dbModal .db-actions .btn { min-width: 0; padding: 10px 4px; font-size: 0.82rem; }
+    /* Database Sync Modal Specific */
+    .db-info-card {
+      background: #f4f6f9;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .db-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .status-badge.green { background: #d4efdf; color: #196f3d; }
+    .status-badge.orange { background: #fdebd0; color: #b9770e; }
+    .status-badge.blue { background: #d4e6f1; color: #1f618d; }
+
+    .source-box {
+      background: #fdfefe;
+      border: 1px solid #d6dbdf;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+      font-size: 0.85rem;
+    }
+
+    .source-box a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .source-box a:hover {
+      text-decoration: underline;
+    }
+
+    .patch-tip {
+      background: #eaf2f8;
+      border-left: 4px solid var(--accent);
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: #1b4f72;
+      margin: 14px 0;
+    }
+
+    .sync-progress-box {
+      display: none;
+      margin: 16px 0;
+      background: #ebedef;
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: #d5dbdb;
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .progress-bar-inner {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #3498db, #2ecc71);
+      transition: width 0.3s;
+    }
+
+    .sync-status-text {
+      font-size: 0.85rem;
+      color: #555;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .drop-csv-zone {
+      border: 2px dashed #bdc3c7;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      background: #fafafa;
+      cursor: pointer;
+      margin-top: 14px;
+      font-size: 0.88rem;
+      color: #7f8c8d;
+      transition: all 0.2s;
+    }
+
+    .drop-csv-zone:hover {
+      border-color: var(--accent);
+      background: #f0f7fb;
+      color: var(--accent);
+    }
+
+    /* Result Section */
+    .result-section {
+      display: none;
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      margin-bottom: 24px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .outfit-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1b2631;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #219653; }
+    .btn-secondary { background: #eaeded; color: var(--text-main); }
+    .btn-secondary:hover { background: #d5d8dc; }
+    .btn-warning { background: var(--warning); color: #fff; }
+    .btn-warning:hover { background: #d68910; }
+
+    /* Layout: Table + Image */
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 860px) {
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Table */
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: #eaeded;
+      color: #2c3e50;
+      padding: 10px 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    td {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8f9fa;
+    }
+
+    .slot-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: #2980b9;
+      text-align: center;
+      width: 100%;
+    }
+
+    .sub-name {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .dye-tag {
+      font-weight: 600;
+      color: #78281f;
+    }
+
+    .gear-link {
+      color: #1b2631;
+      font-weight: 700;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .gear-link:hover {
+      color: #2980b9;
+      text-decoration: underline;
+    }
+
+    .wiki-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #2471a3;
+      background: #ebf5fb;
+      border: 1px solid #d4e6f1;
+      border-radius: 4px;
+      text-decoration: none;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .wiki-btn:hover {
+      background: #2980b9;
+      color: #fff;
+      border-color: #2980b9;
+    }
+
+    .wiki-btn.google {
+      color: #7f8c8d;
+      background: #f8f9fa;
+      border-color: #e5e7e9;
+    }
+
+    .wiki-btn.google:hover {
+      background: #5d6d7e;
+      color: #fff;
+      border-color: #5d6d7e;
+    }
+
+    .wiki-btn.lucky {
+      color: #0e6251;
+      background: #e8f8f5;
+      border-color: #a3e4d7;
+    }
+
+    .wiki-btn.lucky:hover {
+      background: #16a085;
+      color: #fff;
+      border-color: #16a085;
+    }
+
+    .source-verified {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: #1e8449;
+    }
+
+    .source-ai-badge {
+      font-size: 0.72rem;
+      color: #975a16;
+      background: #fefcbf;
+      border: 1px solid #fbd38d;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+      display: inline-block;
+      vertical-align: middle;
+      font-weight: normal;
+      cursor: help;
+    }
+
+    /* Image Preview */
+    .image-preview-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      background: #fdfefe;
+      text-align: center;
+    }
+
+    .image-preview-card img {
+      max-width: 100%;
+      max-height: 480px;
+      object-fit: contain;
+      border-radius: 6px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Warning Note */
+    .note-box {
+      margin-top: 18px;
+      background: #fef9e7;
+      border-left: 4px solid #f1c40f;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      color: #7d6608;
+    }
+
+    /* Loading Spinner */
+    .loading-overlay {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      background: #fff;
+      border-radius: 14px;
+      margin-bottom: 24px;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid var(--accent);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-weight: 600;
+      color: var(--primary);
+      font-size: 1.05rem;
+    }
+
+    .loading-sub {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Live Status Console */
+    .status-console {
+      margin-top: 20px;
+      background: #1b2631;
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: left;
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.85rem;
+      border: 1px solid #2c3e50;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .console-header {
+      font-size: 0.75rem;
+      color: #85929e;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+    }
+
+    .log-item {
+      margin-bottom: 6px;
+      line-height: 1.45;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .log-time {
+      color: #7f8c8d;
+      flex-shrink: 0;
+    }
+
+    .log-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .log-badge.info { background: #2980b9; color: #fff; }
+    .log-badge.warn { background: #d35400; color: #fff; }
+    .log-badge.success { background: #27ae60; color: #fff; }
+
+    .log-text {
+      color: #ecf0f1;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #2ecc71;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 30px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: transform 0.3s ease;
+      z-index: 2000;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+      /* === [SECTION: CSS_STYLES] END === */
+  </style>
+</head>
+<body>
+
+<!-- === [SECTION: HTML_DOM] START === -->
+<div class="container">
+  <!-- Header (全語系統一排版：按鈕右上固定，說明獨立下一行) -->
+  <header>
+    <div class="header-top">
+      <div class="header-title">
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.3.0版</span></h1>
+      </div>
+      <div class="header-actions">
+        <button class="header-btn" id="dbBtn" onclick="openDbModal()">
+           <span id="dbBtnLabel">裝備庫: 官方同步</span>
+        </button>
+        <button class="header-btn" onclick="openKeyModal()">
+          🔑 <span id="keyBtnLabel">設定 API Key</span>
+        </button>
+      </div>
+    </div>
+    <div class="header-subtext">
+      拖入穿搭圖片 ──► AI辨識 ──► 灰機直達 / 站內搜尋 / 鴨鴨好手氣（Google 備援）
+    </div>
+  </header>
+
+  <!-- Auto Detected Version Notice Banner -->
+  <div class="version-banner" id="versionBanner">
+    <div class="version-banner-content">
+      <div>
+        <b>🔔 官方開源數據庫已更新！</b>
+        <span id="versionBannerText">偵測到遊戲有最新裝備數據，建議大改版後同步。</span>
+      </div>
+      <button class="version-banner-btn" onclick="openDbModal()">前往一鍵同步</button>
+    </div>
+  </div>
+
+  <!-- Upload Area -->
+  <div class="upload-card" id="dropZone" onclick="triggerFileInput()">
+    <div class="upload-icon">📸</div>
+    <div class="upload-title">點擊或拖放外觀截圖至此處（支援剪貼簿 Ctrl+V 貼上）</div>
+    <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF（建議使用帶有日文/英文裝備名稱標籤的 EC 截圖）</div>
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-overlay" id="loadingBox">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingMsg">AI 正在讀取圖片文字並索引官方裝備庫...</div>
+    <div class="loading-sub">⏳ 尖峰時段多伺服器自動協調約需 20~40 秒，請稍候</div>
+
+    <!-- Live Status Console -->
+    <div class="status-console" id="statusConsole">
+      <div class="console-header">⚡ 即時連線與分析日誌（自動切換伺服器備援）</div>
+      <div id="statusLogList"></div>
+    </div>
+  </div>
+
+  <!-- Result Section -->
+  <div class="result-section" id="resultSection">
+    <div class="result-header">
+      <div class="outfit-title" id="outfitTitle">【套裝】復古大地色系優雅侍者長裙風</div>
+      <div class="action-buttons">
+        <button class="btn btn-success" onclick="copyToClipboard()">📋 一鍵複製到 Excel</button>
+        <button class="btn btn-primary" onclick="downloadCSV()">💾 下載 CSV 表格</button>
+        <button class="btn btn-secondary" onclick="downloadTXT()">📝 下載 TXT 筆記</button>
+      </div>
+    </div>
+
+    <div class="result-grid">
+      <!-- Left: Table -->
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 12%;">部位</th>
+              <th style="width: 32%;">繁中裝備名稱</th>
+              <th style="width: 38%;">取得方式</th>
+              <th style="width: 18%;">染色設定</th>
+            </tr>
+          </thead>
+          <tbody id="itemsTableBody">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+
+        <!-- Warning / Note -->
+        <div class="note-box" id="noteBox"></div>
+      </div>
+
+      <!-- Right: Image Preview -->
+      <div class="image-preview-card">
+        <img id="previewImg" src="" alt="預覽圖">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database Management & Sync Modal (V2 New) -->
+<div class="modal-overlay" id="dbModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>📦 官方裝備資料庫管理 (V2)</h3>
+    </div>
+    <div class="modal-body">
+
+
+      <div class="db-info-card" id="databaseVersionRows"></div>
+
+      <div class="patch-tip" id="databaseUpdateTip">檢查版本中…</div>
+      <!-- Progress Container -->
+      <div class="sync-progress-box" id="syncProgressBox">
+        <div class="sync-status-text">
+          <span id="syncStepText">連線中...</span>
+          <span id="syncPercentText">0%</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-inner" id="syncProgressBar"></div>
+        </div>
+      </div>
+
+      <!-- Manual Drag & Drop CSV Fallback -->
+      <div class="drop-csv-zone" id="csvDropZone" onclick="document.getElementById('csvFileInput').click()">
+        📁 點擊或拖入資料庫 <code>.json</code>；亦可匯入單語 <code>Item.csv</code>（CSV 請在選檔前指定語言）<br><select id="csvLanguage" onclick="event.stopPropagation()"><option value="chs">簡中</option><option value="tc">繁中</option><option value="en">英文</option><option value="ja">日文</option><option value="fr">法文</option><option value="de">德文</option></select>
+        <input type="file" id="csvFileInput" accept=".csv,.json" style="display:none;" onchange="handleCsvFileSelect(event)">
+      </div>
+    </div>
+    <div class="modal-footer db-actions">
+      <button class="btn btn-primary" data-sync id="startSyncBtn" onclick="syncAllDatabases()" title="同步三庫；略過已成功且無更新的庫">一鍵同步庫</button>
+      <button class="btn btn-secondary" onclick="resetToDefaultDb()" title="清除瀏覽器內的裝備庫">清除資料庫</button>
+      <button class="btn btn-secondary" onclick="closeDbModal()" title="關閉視窗，也可按 Esc">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- API Key / Provider Settings Modal -->
+<div class="modal-overlay" id="keyModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>⚙️ AI 服務商與 API Key 設定</h3>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom: 12px; color: #576574; font-size: 0.88rem; line-height: 1.5;">
+        🔒 <b>隱私承諾：</b>本工具為 100% 純前端開源架構，無任何後端伺服器。您的金鑰<b>僅保存在您本機瀏覽器內 (localStorage)</b>，識別請求由瀏覽器直連官方 API，絕不上傳或紀錄任何資料，歡迎隨時按 F12 檢驗網路封包與程式碼。<br>
+        💡 可下載此 HTML 在本機開啟，並匯入 JSON 資料庫。名稱查詢可離線使用；AI 辨識、灰機預查與同步仍需要網路。
+      </p>
+      
+      <div class="input-group">
+        <label for="providerSelect">選擇 AI 服務商：</label>
+        <select id="providerSelect" onchange="onProviderChange()">
+          <option value="gemini">🌟 Google Gemini（推薦首選，每天 1,000 次免費）</option>
+          <option value="openai">⚡ OpenAI 官方（GPT-4o-mini，極度穩定，需付費帳號）</option>
+          <option value="custom">🌐 萬用自訂 / OpenRouter / OpenAI 相容接口（支援 Claude 3.5、Qwen 等）</option>
+        </select>
+      </div>
+
+      <!-- Gemini Config Panel -->
+      <div id="geminiConfigBox" style="margin-top: 14px;">
+        <div class="step-box">
+          <b>💡 Google Gemini 免費取得步驟（每天 1,000 次額度）：</b>
+          <ol>
+            <li>前往 <a href="https://aistudio.google.com/" target="_blank" style="color:var(--accent); font-weight:bold;">Google AI Studio 官網 (點此開新視窗)</a>。</li>
+            <li>登入 Google 帳號，點擊 <b>「Get API key」</b> 後再點擊 <b>「Create API key」</b>。</li>
+            <li>預設自動啟用 <code>gemini-3.5-flash-lite</code> 與 <code>gemini-3.1-flash-lite</code> 雙重高速輪詢。</li>
+          </ol>
+        </div>
+        <div class="input-group">
+          <label for="apiKeyInput">Google Gemini API Key：</label>
+          <input type="password" id="apiKeyInput" placeholder="AIzaSy...">
+        </div>
+      </div>
+
+      <!-- OpenAI Config Panel -->
+      <div id="openaiConfigBox" style="display:none; margin-top: 14px;">
+        <div class="step-box">
+          <b>💡 OpenAI 設定說明：</b>
+          <p style="margin:4px 0 0; font-size:0.85rem; color:#555;">
+            需使用已開通付費儲值的 OpenAI 帳號。預設呼叫 <code>gpt-4o-mini</code> 視覺模型，辨識一張約 0.001 美元（約 0.03 台幣），伺服器永不塞車。
+          </p>
+        </div>
+        <div class="input-group">
+          <label for="openaiKeyInput">OpenAI API Key：</label>
+          <input type="password" id="openaiKeyInput" placeholder="sk-proj-...">
+        </div>
+      </div>
+
+      <!-- Custom / OpenRouter Config Panel -->
+      <div id="customConfigBox" style="display:none; margin-top: 14px;">
+        <div class="step-box">
+          <b>💡 萬用自訂接口說明：</b>
+          <p style="margin:4px 0 0; font-size:0.85rem; color:#555;">
+            相容標準 OpenAI 格式（如 <a href="https://openrouter.ai/" target="_blank" style="color:var(--accent); font-weight:bold;">OpenRouter</a>、OneAPI、自建中轉站等）。一組 Key 可呼叫 Claude 3.5 Sonnet/Haiku、GPT-4o 或任何開源 Vision 模型！
+          </p>
+        </div>
+        <div class="input-group">
+          <label for="customBaseUrlInput">API Base URL (接口端點)：</label>
+          <input type="text" id="customBaseUrlInput" placeholder="https://openrouter.ai/api/v1">
+        </div>
+        <div class="input-group">
+          <label for="customModelInput">模型名稱 (Model ID)：</label>
+          <input type="text" id="customModelInput" placeholder="openai/gpt-4o-mini 或 anthropic/claude-3.5-haiku">
+        </div>
+        <div class="input-group">
+          <label for="customKeyInput">自訂 API Key：</label>
+          <input type="password" id="customKeyInput" placeholder="sk-or-v1-... 或自訂 Key">
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeKeyModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">確認儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">已成功複製到剪貼簿！</div>
+
+<!-- === [SECTION: HTML_DOM] END === -->
+
+<script>
+  let currentOutfitData = null;
+  let currentImageBase64 = null;
+  let currentImageMime = "image/jpeg";
+
+  // === [SECTION: JS_GLOBAL_STATE] START ===
+  // 全域狀態與 v2.3.0 版本設定
+  const BUILTIN_VERSION = {
+    version: "v2.3.0",
+    sha: "builtin-v2.3.0",
+    date: "2026-10-04",
+    label: "v2.3.0版"
+  };
+
+  // 1. 初始化
+  window.addEventListener("DOMContentLoaded", async () => {
+    updateKeyButtonState();
+    setupDropZone();
+    setupClipboardPaste();
+    const databaseDrop = document.getElementById('csvDropZone');
+    ['dragenter','dragover','dragleave','drop'].forEach(name => databaseDrop.addEventListener(name,preventDefaults));
+    databaseDrop.addEventListener('drop',event => {
+      const file = event.dataTransfer.files[0];
+      if (file) processLocalCsvFile(file);
+    });
+    await loadDatabaseFromIDB();
+    await loadPrebuiltDatabaseIfEmpty();
+    initDatabaseState();
+
+    if (!getApiKey()) {
+      openKeyModal();
+    }
+  });
+
+  // === [SECTION: JS_GLOBAL_STATE] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_PROVIDER_CONFIG] START ===
+  // ==============================================================================
+  // 多品牌 AI 服務商與 API Key 管理
+  function getActiveProvider() {
+    return localStorage.getItem("ff14_ai_provider") || "gemini";
+  }
+
+  function getApiKey() {
+    const provider = getActiveProvider();
+    if (provider === "openai") {
+      return localStorage.getItem("ff14_openai_api_key") || "";
+    } else if (provider === "custom") {
+      return localStorage.getItem("ff14_custom_api_key") || "";
+    } else {
+      return localStorage.getItem("ff14_gemini_api_key") || "";
+    }
+  }
+
+  function onProviderChange() {
+    const sel = document.getElementById("providerSelect").value;
+    document.getElementById("geminiConfigBox").style.display = (sel === "gemini") ? "block" : "none";
+    document.getElementById("openaiConfigBox").style.display = (sel === "openai") ? "block" : "none";
+    document.getElementById("customConfigBox").style.display = (sel === "custom") ? "block" : "none";
+  }
+
+  function updateKeyButtonState() {
+    const provider = getActiveProvider();
+    const key = getApiKey();
+    const btnLabel = document.getElementById("keyBtnLabel");
+    
+    let pName = "Google Gemini";
+    if (provider === "openai") pName = "OpenAI";
+    else if (provider === "custom") pName = "自訂 / OpenRouter";
+
+    if (key) {
+      btnLabel.innerText = ` ${pName} (已設定)`;
+    } else {
+      btnLabel.innerText = ` 設定 AI Key (${pName})`;
+    }
+  }
+
+  function openKeyModal() {
+    const provider = getActiveProvider();
+    document.getElementById("providerSelect").value = provider;
+    document.getElementById("apiKeyInput").value = localStorage.getItem("ff14_gemini_api_key") || "";
+    document.getElementById("openaiKeyInput").value = localStorage.getItem("ff14_openai_api_key") || "";
+    document.getElementById("customBaseUrlInput").value = localStorage.getItem("ff14_custom_base_url") || "https://openrouter.ai/api/v1";
+    document.getElementById("customModelInput").value = localStorage.getItem("ff14_custom_model") || "openai/gpt-4o-mini";
+    document.getElementById("customKeyInput").value = localStorage.getItem("ff14_custom_api_key") || "";
+    onProviderChange();
+    document.getElementById("keyModal").style.display = "flex";
+  }
+
+  function closeKeyModal() {
+    document.getElementById("keyModal").style.display = "none";
+  }
+
+  function saveApiKey() {
+    const provider = document.getElementById("providerSelect").value;
+    localStorage.setItem("ff14_ai_provider", provider);
+
+    if (provider === "gemini") {
+      const gKey = document.getElementById("apiKeyInput").value.trim();
+      if (!gKey) { alert("請輸入有效的 Google Gemini API Key！"); return; }
+      localStorage.setItem("ff14_gemini_api_key", gKey);
+    } else if (provider === "openai") {
+      const oKey = document.getElementById("openaiKeyInput").value.trim();
+      if (!oKey) { alert("請輸入有效的 OpenAI API Key！"); return; }
+      localStorage.setItem("ff14_openai_api_key", oKey);
+    } else if (provider === "custom") {
+      const cKey = document.getElementById("customKeyInput").value.trim();
+      const cUrl = document.getElementById("customBaseUrlInput").value.trim();
+      const cModel = document.getElementById("customModelInput").value.trim();
+      if (!cKey) { alert("請輸入有效的自訂 API Key！"); return; }
+      if (!cUrl) { alert("請輸入有效的 API Base URL！"); return; }
+      if (!cModel) { alert("請輸入欲呼叫的模型名稱！"); return; }
+      localStorage.setItem("ff14_custom_api_key", cKey);
+      localStorage.setItem("ff14_custom_base_url", cUrl);
+      localStorage.setItem("ff14_custom_model", cModel);
+    }
+
+    updateKeyButtonState();
+    closeKeyModal();
+    showToast("✅ AI 服務商與金鑰設定儲存成功！");
+  }
+
+  // === [SECTION: JS_PROVIDER_CONFIG] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_INDEXEDDB_CACHE] START ===
+  // ==============================================================================
+  // IndexedDB 高速大容量存儲引擎（徹底解除 5MB 限制，輕鬆容納數萬筆官方全裝備數據庫）
+  const IDB_NAME = "FF14_GLAMOUR_DB_V2";
+  const IDB_STORE = "items_store";
+  let cachedCustomDb = null;
+
+  function openItemDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(IDB_NAME, 1);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      request.onsuccess = (e) => resolve(e.target.result);
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async function saveDatabaseToIDB(payload) {
+    validateDatabase(payload);
+    try {
+      const db = await openItemDatabase();
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).put(payload, 'custom_dict');
+          tx.oncomplete = resolve;
+          tx.onerror = tx.onabort = () => reject(tx.error || new Error('資料庫寫入失敗'));
+        });
+      } finally { db.close(); }
+    } catch (err) {
+      // Storage failure must not masquerade as successful installation.
+      try { localStorage.setItem('ff14_custom_items_dict_220', JSON.stringify(payload)); }
+      catch { throw new Error('無法保存資料庫，請允許瀏覽器儲存或釋放空間。原資料庫未替換。'); }
+    }
+    cachedCustomDb = payload;
+    wikiSearchCache.clear();
+    return true;
+  }
+
+  async function loadDatabaseFromIDB() {
+    try {
+      const db = await openItemDatabase();
+      try {
+        cachedCustomDb = await new Promise((resolve, reject) => {
+          const req = db.transaction(IDB_STORE).objectStore(IDB_STORE).get('custom_dict');
+          req.onsuccess = () => resolve(req.result || null);
+          req.onerror = () => reject(req.error);
+        });
+      } finally { db.close(); }
+    } catch {}
+    if (!cachedCustomDb) {
+      try { cachedCustomDb = JSON.parse(localStorage.getItem('ff14_custom_items_dict_220') || 'null'); } catch {}
+    }
+    try { if (cachedCustomDb) validateDatabase(cachedCustomDb); }
+    catch { cachedCustomDb = null; }
+    return cachedCustomDb;
+  }
+
+  async function loadPrebuiltDatabaseIfEmpty() {
+    if (cachedCustomDb) return cachedCustomDb;
+    // file:// cannot reliably read neighbouring files. Use explicit import there.
+    if (location.protocol === 'file:') return null;
+    try {
+      const resp = await fetch('./ff14_database.json', { signal: AbortSignal.timeout(60000) });
+      if (resp.ok) await saveDatabaseToIDB(await resp.json());
+    } catch (err) { console.info('請同步或匯入資料庫：', err.message); }
+    return cachedCustomDb;
+  }
+
+  function getCustomDatabase() {
+    return cachedCustomDb;
+  }
+
+  function initDatabaseState() {
+    const db = getCustomDatabase();
+    const count = db ? (db.records ? Object.keys(db.records).length : new Set(Object.values(db.items)).size) : 0;
+    renderDatabaseVersions();
+    document.getElementById('dbBtnLabel').innerText = db ? '📦 裝備庫：' + count.toLocaleString() + ' 件' : '📦 安裝裝備庫';
+  }
+
+  function openDbModal() {
+    document.getElementById("dbModal").style.display = "flex";
+    renderDatabaseVersions();
+    checkDatabaseVersions();
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeDbModal();
+  });
+
+  function closeDbModal() {
+    document.getElementById("dbModal").style.display = "none";
+  }
+
+  // === [SECTION: JS_INDEXEDDB_CACHE] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_SYNC_ENGINE] START ===
+  // ==============================================================================
+  // 免 AI 靜默向 GitHub 檢查是否有新版本
+  // V2 前端一鍵同步與「脫水減肥」引擎
+  const ITEM_REPO = 'InfSein/ffxiv-datamining-mixed';
+  const SOURCE_REPO = 'Critical-Impact/LuminaSupplemental';
+  const SOURCE_FILES = ['DungeonDrop','DungeonBossDrop','DungeonBossChest','DungeonChest','DungeonChestItem','StoreItem','FateItem','MobDrop','RetainerVentureItem'];
+
+  async function fetchText(url, optional = false) {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(600000) });
+    if (optional && resp.status === 404) return null;
+    if (!resp.ok) throw new Error('下載失敗 HTTP ' + resp.status + '：' + url);
+    return resp.text();
+  }
+
+  function normalizeItemName(value) {
+    return String(value || '').normalize('NFKC').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  // CSV records may contain quoted newlines and doubled quotes.
+  function parseCsv(text) {
+    const rows = [];
+    let row = [], value = '', quoted = false;
+    text = text.replace(/^\uFEFF/, '');
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === '"') {
+        if (quoted && text[i + 1] === '"') { value += '"'; i++; }
+        else quoted = !quoted;
+      } else if (c === ',' && !quoted) { row.push(value); value = ''; }
+      else if ((c === '\n' || c === '\r') && !quoted) {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(value);
+        if (row.some(v => v !== '')) rows.push(row);
+        row = []; value = '';
+      } else value += c;
+    }
+    if (quoted) throw new Error('CSV 引號未閉合');
+    if (value || row.length) { row.push(value); rows.push(row); }
+    return rows;
+  }
+
+  function readSheet(text, fields) {
+    const rows = parseCsv(text);
+    const headerIndex = rows.findIndex(r => fields.every(f => r.includes(f)));
+    if (headerIndex < 0) throw new Error('CSV 欄位不符：' + fields.join(', '));
+    const header = rows[headerIndex];
+    const indexes = Object.fromEntries(fields.map(f => [f, header.indexOf(f)]));
+    return rows.slice(headerIndex + 1).filter(r => /^\d+(?:\.\d+)?$/.test(r[0])).map(r =>
+      Object.fromEntries([['id',r[0]], ...fields.map(f => [f,r[indexes[f]] || ''])]));
+  }
+
+  function buildDatabase(languageTexts, version) {
+    const records = Object.create(null);
+    for (const [lang, text] of Object.entries(languageTexts)) {
+      for (const r of readSheet(text, ['Name','EquipSlotCategory'])) {
+        if (!r.Name || !Number(r.EquipSlotCategory)) continue;
+        const record = records[r.id] ||= { names: {} };
+        record.names[lang] = r.Name;
+      }
+    }
+    const items = Object.create(null);
+    for (const [id, record] of Object.entries(records)) {
+      for (const name of new Set(Object.values(record.names))) {
+        const key = normalizeItemName(name);
+        const ids = items[key] ||= [];
+        if (!ids.includes(id)) ids.push(id);
+      }
+    }
+    return { schemaVersion: 2, version, updatedAt: new Date().toISOString(),
+      languages: Object.fromEntries(Object.keys(languageTexts).map(lang => [lang,{commit:version.sha}])),
+      records, items, sources: {}, provenance: [] };
+  }
+
+  function buildSources(texts, duties = {}) {
+    const sources = Object.create(null);
+    const add = (id, text) => {
+      if (!/^\d+$/.test(id)) return;
+      const list = sources[id] ||= [];
+      if (!list.some(s => s.text === text)) list.push({text, provider:'LuminaSupplemental'});
+    };
+    const dutyName = id => duties[id] || ('副本 ID ' + id);
+    for (const f of ['DungeonDrop','DungeonBossDrop','DungeonBossChest']) {
+      for (const r of readSheet(texts[f], ['ItemId','ContentFinderConditionId']))
+        add(r.ItemId, dutyName(r.ContentFinderConditionId) + (f === 'DungeonBossChest' ? '（頭目寶箱）' : '（掉落）'));
+    }
+    const chests = Object.fromEntries(readSheet(texts.DungeonChest, ['RowId','ContentFinderConditionId']).map(r => [r.RowId,r.ContentFinderConditionId]));
+    for (const r of readSheet(texts.DungeonChestItem, ['ItemId','ChestId'])) {
+      if (chests[r.ChestId]) add(r.ItemId,dutyName(chests[r.ChestId]) + '（副本寶箱）');
+    }
+    for (const r of readSheet(texts.StoreItem, ['ItemId'])) add(r.ItemId,'國際服線上道具商城（其他伺服器請查灰機）');
+    for (const r of readSheet(texts.FateItem, ['ItemId','FateId'])) add(r.ItemId,'FATE 獎勵（FATE ID ' + r.FateId + '）');
+    for (const r of readSheet(texts.MobDrop, ['ItemId','BNpcNameId'])) add(r.ItemId,'怪物掉落（怪物 ID ' + r.BNpcNameId + '）');
+    for (const r of readSheet(texts.RetainerVentureItem, ['ItemId'])) add(r.ItemId,'雇員探險（社群資料記錄）');
+    return sources;
+  }
+
+  function validateDatabase(db) {
+    if (!db || typeof db !== 'object' || !db.items || Array.isArray(db.items) || typeof db.items !== 'object' || !Object.keys(db.items).length)
+      throw new Error('JSON 缺少有效的 items 名稱索引');
+    if (db.schemaVersion != null && db.schemaVersion !== 2) throw new Error('不支援的資料庫版本');
+    if (db.schemaVersion === 2) {
+      if (!db.records || typeof db.records !== 'object' || Array.isArray(db.records)) throw new Error('JSON 缺少 records 物品資料');
+      for (const [id, record] of Object.entries(db.records)) {
+        if (!/^\d+$/.test(id) || !record?.names || !Object.values(record.names).every(n => typeof n === 'string') || (record.aliases && (!Array.isArray(record.aliases) || !record.aliases.every(n => typeof n === 'string'))))
+          throw new Error('物品資料格式不符');
+      }
+      for (const ids of Object.values(db.items)) {
+        if (!Array.isArray(ids) || !ids.length || !ids.every(id => Object.hasOwn(db.records,id))) throw new Error('名稱索引包含無效物品 ID');
+      }
+      for (const list of Object.values(db.sources || {})) {
+        if (!Array.isArray(list) || !list.every(s => s && typeof s.text === 'string')) throw new Error('取得方式資料格式不符');
+      }
+    } else if (!Object.values(db.items).every(n => typeof n === 'string')) throw new Error('不支援的資料庫格式');
+    return db;
+  }
+
+  let databaseDirectory;
+  function directoryStore(writeHandle) {
+    return new Promise((resolve,reject) => {
+      const request = indexedDB.open('FF14_V220_FILES',1);
+      request.onupgradeneeded = () => request.result.createObjectStore('settings');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction('settings',writeHandle ? 'readwrite' : 'readonly');
+        const op = writeHandle ? tx.objectStore('settings').put(writeHandle,'directory') : tx.objectStore('settings').get('directory');
+        let result;
+        op.onsuccess = () => result = op.result;
+        tx.oncomplete = () => { db.close(); resolve(result); };
+        tx.onabort = tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+    });
+  }
+  async function prepareDatabaseDirectory() {
+    if (!window.showDirectoryPicker) throw new Error('此瀏覽器不支援資料夾寫入，請用 Chrome 或 Edge 開啟，或直接匯入現有 JSON。');
+    databaseDirectory ||= await directoryStore();
+    if (databaseDirectory && await databaseDirectory.queryPermission({mode:'readwrite'}) !== 'granted') {
+      if (await databaseDirectory.requestPermission({mode:'readwrite'}) !== 'granted') databaseDirectory = null;
+    }
+    if (!databaseDirectory) {
+      databaseDirectory = await window.showDirectoryPicker({id:'ff14-database',mode:'readwrite'});
+      await directoryStore(databaseDirectory);
+    }
+  }
+  async function saveDatabaseFile(db) {
+    try {
+      const file = await databaseDirectory.getFileHandle('ff14_database.json',{create:true});
+      const writer = await file.createWritable();
+      try { await writer.write(JSON.stringify(db)); await writer.close(); }
+      catch (error) { await writer.abort().catch(()=>{}); throw error; }
+      return '已保存瀏覽器與資料夾 JSON。';
+    } catch (error) {
+      return '瀏覽器已安裝；JSON 寫入失敗：' + error.message;
+    }
+  }
+
+  // === [SECTION: JS_TEAMCRAFT_DATABASE] START ===
+  const TEAMCRAFT_REPO = 'ffxiv-teamcraft/ffxiv-teamcraft';
+  const TEAMCRAFT_FILES = {
+    items:'libs/data/src/lib/json/items.json', zhItems:'libs/data/src/lib/json/zh/zh-items.json',
+    twItems:'libs/data/src/lib/json/tw/tw-items.json', equipSlots:'libs/data/src/lib/json/item-equip-slot-category.json',
+    extracts:'libs/data/src/lib/extracts/extracts.json', instances:'libs/data/src/lib/json/instances.json',
+    zhInstances:'libs/data/src/lib/json/zh/zh-instances.json', twInstances:'libs/data/src/lib/json/tw/tw-instances.json',
+    npcs:'libs/data/src/lib/json/npcs.json', zhNpcs:'libs/data/src/lib/json/zh/zh-npcs.json',
+    twNpcs:'libs/data/src/lib/json/tw/tw-npcs.json', quests:'libs/data/src/lib/json/quests.json',
+    zhQuests:'libs/data/src/lib/json/zh/zh-quests.json', twQuests:'libs/data/src/lib/json/tw/tw-quests.json',
+    zhShops:'libs/data/src/lib/json/zh/zh-shops.json', twShops:'libs/data/src/lib/json/tw/tw-shops.json', license:'LICENSE'
+  };
+  let databaseSyncBusy = false;
+
+  function teamcraftName(data, group, id, fallback) {
+    const upper = group[0].toUpperCase() + group.slice(1);
+    return data['tw' + upper]?.[id]?.tw || data['zh' + upper]?.[id]?.zh ||
+      data[group]?.[id]?.en || data[group]?.[id]?.ja || fallback;
+  }
+
+  function buildTeamcraftSources(data, records) {
+    const output = Object.create(null);
+    const itemName = id => teamcraftName(data,'items',id,'物品 ID ' + id);
+    const npcName = id => teamcraftName(data,'npcs',id,'NPC ID ' + id);
+    const i18nName = obj => obj?.tw || obj?.zh || obj?.en || obj?.ja || '';
+    const jobs = {8:'木工師',9:'鍛造師',10:'甲冑師',11:'金工師',12:'皮革師',13:'裁縫師',14:'鍊金術師',15:'烹調師'};
+    function routes(id, path = []) {
+      // ponytail: resolve at most three nested containers; deeper chains remain a named container for wiki lookup.
+      if (path.includes(String(id)) || path.length > 3) return [];
+      const entries = data.extracts[id]?.sources || [];
+      const found = [];
+      const add = (kind,text) => {
+        if (text && !found.some(s => s.text === text)) found.push({kind,text,provider:'Teamcraft'});
+      };
+      for (const source of entries) {
+        const list = Array.isArray(source.data) ? source.data : [];
+        switch (source.type) {
+          case 1:
+            for (const r of list) if (String(r.itemId) === String(id))
+              add('craft','生產製作：' + (jobs[r.job] || '製作職業 ID ' + r.job) + ' Lv.' + r.lvl);
+            break;
+          case 2:
+            for (const shop of list) {
+              const shopName = teamcraftName(data,'shops',shop.id,i18nName(shop.shopName) || '商店 ID ' + shop.id);
+              const npcs = [...new Set((shop.npcs || []).map(n => npcName(n.id)))].join('／');
+              for (const trade of shop.trades || []) {
+                if (!(trade.items || []).some(item => String(item.id) === String(id))) continue;
+                // Some SpecialShop records use gil IDs for internal conditions, not actual gil prices.
+                const costs = (trade.currencies || []).filter(c => Number(c.id) > 1 && Number(c.amount) > 0)
+                  .map(c => itemName(c.id) + ' ×' + c.amount).join('＋');
+                const jobGear = /Job Gear/.test(shop.shopName?.en || '');
+                add('trade',(jobGear ? '職業裝備領取' : '商店兌換') + '：' +
+                  (npcs ? npcs + '／' : '') + shopName + (costs ? '（' + costs + '）' : '（領取條件請查灰機）'));
+              }
+            }
+            break;
+          case 3:
+            for (const vendor of list) {
+              const repurchase = /Purchase Quest Rewards|Recompense|Repurchase/i.test(vendor.shopName?.en || '');
+              add('vendor',(repurchase ? '補購' : 'NPC 商店') + '：' + npcName(vendor.npcId) +
+                (Number.isFinite(vendor.price) ? '（' + vendor.price + ' 金幣' + (repurchase ? '，需先取得／解鎖' : '') + '）' : ''));
+            }
+            break;
+          case 6:
+            for (const duty of list) add('instance','副本掉落：' + teamcraftName(data,'instances',duty,'副本 ID ' + duty));
+            break;
+          case 9:
+            for (const voyage of list) add('voyage','飛空艇／潛水艇探索：' + (i18nName(voyage.name) || '探索路線'));
+            break;
+          case 10:
+            for (const drop of list) add('drop','怪物掉落（怪物 ID ' + drop.id + '，詳情請查灰機）');
+            break;
+          case 13:
+            for (const container of list) {
+              const parents = routes(container,[...path,String(id)]);
+              const details = parents.map(s => s.text).join('；');
+              add('container','開啟物品箱：' + itemName(container) + (details ? '【' + details + '】' : ''));
+            }
+            break;
+          case 14:
+            for (const fate of list) add('fate','FATE 獎勵（FATE ID ' + fate.id + '，詳情請查灰機）');
+            break;
+          case 15:
+            if (list.length) add('venture','雇員探險（Teamcraft 資料記錄）');
+            break;
+          case 18:
+            for (const quest of list) add('quest','任務獎勵：' + teamcraftName(data,'quests',quest,'任務 ID ' + quest));
+            break;
+          case 19:
+            for (const achievement of list) add('achievement','成就獎勵（成就 ID ' + achievement + '，詳情請查灰機）');
+            break;
+          case 21:
+            if (source.data && !Array.isArray(source.data) && Number(source.data.id) > 0)
+              add('mogstation','國際服線上道具商城（商品 ID ' + source.data.id + '；其他伺服器請查灰機）');
+            break;
+          // Requirements, masterbooks, alarms and deprecated markers are not acquisition routes.
+        }
+      }
+      const priority = {quest:0,instance:1,container:2,craft:3,trade:4,vendor:5};
+      return found.sort((a,b) => (priority[a.kind] ?? 6) - (priority[b.kind] ?? 6));
+    }
+    for (const id of Object.keys(records)) {
+      const found = routes(id);
+      if (found.length) output[id] = found;
+    }
+    return output;
+  }
+
+  function buildTeamcraftDatabase(data, version, previous = null) {
+    for (const key of ['items','zhItems','twItems','equipSlots','extracts']) {
+      if (!data[key] || typeof data[key] !== 'object' || Array.isArray(data[key])) throw new Error('Teamcraft 缺少 ' + key);
+    }
+    if (!Object.keys(data.equipSlots).length || !Object.keys(data.extracts).length) throw new Error('Teamcraft 資料為空');
+    if (typeof data.license !== 'string' || !data.license.includes('MIT License')) throw new Error('Teamcraft 授權資訊未載入');
+    const db = {schemaVersion:2, version, updatedAt:new Date().toISOString(),
+      records:Object.create(null), items:Object.create(null), sources:{}, languages:{}, provenance:[]};
+    if (previous?.schemaVersion === 2) {
+      validateDatabase(previous);
+      db.records = structuredClone(previous.records);
+      db.provenance = (previous.provenance || []).filter(p => p.repo !== TEAMCRAFT_REPO);
+    }
+    for (const [id,slot] of Object.entries(data.equipSlots)) {
+      if (!/^\d+$/.test(id) || !Number(slot)) continue;
+      const names = Object.fromEntries(Object.entries(data.items[id] || {}).filter(([lang,name]) =>
+        ['en','ja','fr','de'].includes(lang) && typeof name === 'string' && name));
+      if (data.zhItems[id]?.zh) names.chs = data.zhItems[id].zh;
+      if (data.twItems[id]?.tw) names.tc = data.twItems[id].tw;
+      if (!Object.keys(names).length) continue;
+      const old = db.records[id];
+      // Retain previous exact names as aliases; no prefix stripping or fuzzy matches.
+      db.records[id] = {names:{...names,...old?.names}};
+      if (names.tc) db.records[id].names.tc = names.tc;
+      const canonical = new Set(Object.values(db.records[id].names));
+      const aliases = [...new Set([...(old?.aliases || []),...Object.values(names),...Object.values(old?.names || {})])]
+        .filter(n => typeof n === 'string' && n && !canonical.has(n));
+      if (aliases.length) db.records[id].aliases = aliases;
+    }
+    for (const [id,record] of Object.entries(db.records)) {
+      for (const name of new Set([...Object.values(record.names),...(record.aliases || [])])) {
+        const key = normalizeItemName(name);
+        if (!key) continue;
+        const ids = db.items[key] ||= [];
+        if (!ids.includes(id)) ids.push(id);
+      }
+      for (const lang of Object.keys(record.names)) db.languages[lang] = {commit:version.sha};
+    }
+    db.sources = buildTeamcraftSources(data,db.records);
+    // Supplemental data is only a fallback for IDs without Teamcraft acquisition records.
+    for (const [id,list] of Object.entries(previous?.sources || {})) {
+      if (db.records[id] && !db.sources[id] && list.some(s => s.provider === 'LuminaSupplemental'))
+        db.sources[id] = structuredClone(list.filter(s => s.provider === 'LuminaSupplemental'));
+    }
+    db.provenance.push({repo:TEAMCRAFT_REPO,commit:version.sha,license:'MIT',licenseText:data.license,
+      licenseUrl:'https://github.com/' + TEAMCRAFT_REPO + '/blob/' + version.sha + '/LICENSE',files:TEAMCRAFT_FILES});
+    validateDatabase(db);
+    return db;
+  }
+
+  async function downloadTeamcraftData(progress = () => {}, pinnedVersion = null) {
+    const api = 'https://api.github.com/repos/' + TEAMCRAFT_REPO;
+    const commit = JSON.parse(await fetchText(api + '/commits/' + (pinnedVersion?.sha || 'staging')));
+    if (!/^[a-f0-9]{40}$/.test(commit.sha || '')) throw new Error('Teamcraft 版本資訊無效');
+    const tree = JSON.parse(await fetchText(api + '/git/trees/' + commit.sha + '?recursive=1'));
+    if (tree.truncated || !Array.isArray(tree.tree)) throw new Error('Teamcraft 檔案索引不完整');
+    const paths = new Map(tree.tree.map(entry => [entry.path,entry]));
+    const queue = Object.entries(TEAMCRAFT_FILES);
+    const data = {};
+    let completed = 0;
+    async function worker() {
+      while (queue.length) {
+        const [key,path] = queue.shift();
+        const entry = paths.get(path);
+        if (!entry) throw new Error('Teamcraft 缺少檔案：' + path);
+        const blob = JSON.parse(await fetchText(api + '/git/blobs/' + entry.sha));
+        if (blob.encoding !== 'base64' || typeof blob.content !== 'string') throw new Error('Teamcraft 檔案格式錯誤：' + key);
+        const bytes = Uint8Array.from(atob(blob.content),c => c.charCodeAt(0));
+        if (bytes.length !== entry.size) throw new Error('Teamcraft 檔案下載不完整：' + key);
+        const text = new TextDecoder().decode(bytes);
+        data[key] = key === 'license' ? text : JSON.parse(text);
+        progress('已下載 ' + (++completed) + '/' + Object.keys(TEAMCRAFT_FILES).length + '：' + key,
+          Math.round(5 + completed/Object.keys(TEAMCRAFT_FILES).length * 80));
+      }
+    }
+    await Promise.all([worker(),worker()]);
+    return {data,version:pinnedVersion || await repositoryVersion(TEAMCRAFT_REPO,commit.sha)};
+  }
+
+  // === [SECTION: JS_TEAMCRAFT_DATABASE] END ===
+
+
+
+  // === [SECTION: JS_UNIFIED_DATABASE_SYNC] START ===
+  const DATABASE_REPOS = [
+    {repo:ITEM_REPO,role:'主庫',name:'InfSein',usage:'五語裝備名稱'},
+    {repo:TEAMCRAFT_REPO,role:'來源庫',name:'Teamcraft',usage:'繁中名稱、取得方式'},
+    {repo:SOURCE_REPO,role:'副庫',name:'LuminaSupplemental',usage:'補充取得方式'}
+  ];
+  let remoteDatabaseVersions = {};
+  const taiwanDate = value => value ? new Date(value).toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'}) : '未記錄';
+  async function githubJson(url) { return JSON.parse(await fetchText(url)); }
+  async function githubFileText(repo,sha,path) {
+    let file = await githubJson('https://api.github.com/repos/' + repo + '/contents/' + path + '?ref=' + sha);
+    if (!file.content && file.sha) file = await githubJson('https://api.github.com/repos/' + repo + '/git/blobs/' + file.sha);
+    if (typeof file.content !== 'string') throw new Error('上游檔案無內容');
+    return new TextDecoder().decode(Uint8Array.from(atob(file.content),c=>c.charCodeAt(0)));
+  }
+  async function repositoryVersion(repo, sha) {
+    const api = 'https://api.github.com/repos/' + repo;
+    const commit = await githubJson(api + '/commits/' + (sha || (repo === TEAMCRAFT_REPO ? 'staging' : 'HEAD')));
+    if (!/^[a-f0-9]{40}$/.test(commit.sha || '')) throw new Error('版本資料無效');
+    let label;
+    if (repo === TEAMCRAFT_REPO) {
+      const file = await githubJson(api + '/contents/package.json?ref=' + commit.sha);
+      const pkg = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content),c=>c.charCodeAt(0))));
+      label = 'Teamcraft ' + pkg.version;
+    } else {
+      const releases = await githubJson(api + '/releases?per_page=10');
+      for (const release of releases) {
+        const tagged = await githubJson(api + '/commits/' + encodeURIComponent(release.tag_name));
+        if (tagged.sha === commit.sha) { label = release.name || release.tag_name; break; }
+      }
+      label ||= commit.commit.message.split('\n')[0].replace(/^data:\s*/, '') || '未命名版本';
+    }
+    let gameVersion, gameVersionBasis;
+    try {
+      if (repo === ITEM_REPO) {
+        gameVersion = label.match(/(?:Unpack\s+|GLOBAL\s+|CHS\s+)(\d+\.\d+(?:#hf\d+)?)/i)?.[1];
+        gameVersionBasis = 'release';
+      } else if (repo === TEAMCRAFT_REPO) {
+        const patches = JSON.parse(await githubFileText(repo,commit.sha,'libs/data/src/lib/json/patch-names.json'));
+        const versions = Object.values(patches).map(p=>p.version).filter(v=>/^\d+\.\d+$/.test(v));
+        versions.sort((a,b)=>Number(a)-Number(b));
+        gameVersion = versions.at(-1); gameVersionBasis = 'patch-index';
+      } else {
+        const changelog = await githubFileText(repo,commit.sha,'CHANGELOG.md');
+        const section = changelog.split('## [' + label.replace(/^v/,'') + ']')[1]?.split('\n## ')[0];
+        gameVersion = section?.match(/\b(\d+\.\d+)\s+(?:data\s+)?update\b/i)?.[1];
+        gameVersionBasis = 'changelog';
+      }
+    } catch { /* Version correspondence is optional; never invent one when upstream is unavailable. */ }
+    return {sha:commit.sha,label,date:commit.commit.committer.date,gameVersion,gameVersionBasis};
+  }
+  function renderDatabaseVersions() {
+    const db = getCustomDatabase();
+    const rows = DATABASE_REPOS.map(({repo,role,name}) => {
+      const local = db?.provenance?.find(p=>p.repo === repo);
+      const remote = remoteDatabaseVersions[repo];
+      const state = remote?.error ? '無法檢查更新' : !remote ? '尚未檢查' : !local ? '待安裝' : remote.sha !== local.commit ? '有更新' : '已最新';
+      const known = local && remote?.sha === local.commit ? {...remote,...local,label:local.label || remote.label,dataDate:local.dataDate || remote.date,gameVersion:local.gameVersion || remote.gameVersion,gameVersionBasis:local.gameVersionBasis || remote.gameVersionBasis} : local;
+      const info = DATABASE_REPOS.find(p=>p.repo === repo);
+      const game = known?.gameVersion ? (known.gameVersionBasis === 'patch-index' ? '補丁索引至 ' : '遊戲版本 ') + known.gameVersion : '遊戲版本未標示';
+      const license = repo === TEAMCRAFT_REPO ? '（MIT）' : repo === SOURCE_REPO ? '（GPL-3.0）' : '';
+      return '<div style="margin-bottom:12px">• ' + role + ' <a href="https://github.com/' + repo + '" target="_blank" rel="noopener"><b>' + name + '</b></a>：' +
+        escapeHtml(known?.label || (local ? '版本未記錄' : '未安裝')) + '，' + state +
+        (remote?.label && remote.sha !== local?.commit ? '（最新 ' + escapeHtml(remote.label) + '）' : '') +
+        '<br>— ' + info.usage + license + '<br><span style="color:#64748b">' + escapeHtml(game) +
+        ' · 資料 ' + escapeHtml(taiwanDate(known?.dataDate)) + '</span></div>';
+    });
+    document.getElementById('databaseVersionRows').innerHTML = rows.join('');
+    const source = remoteDatabaseVersions[TEAMCRAFT_REPO];
+    const localSource = db?.provenance?.find(p=>p.repo === TEAMCRAFT_REPO);
+    document.getElementById('databaseUpdateTip').innerText = (source?.error ? '來源庫更新檢查失敗，可按一鍵同步重試。' :
+      !source ? '正在檢查來源庫更新。' : source.sha !== localSource?.commit ? '來源庫有更新，請按一鍵同步。' : '來源庫已最新，遊戲改版後再同步。');
+  }
+  async function checkDatabaseVersions() {
+    await Promise.all(DATABASE_REPOS.map(async ({repo}) => {
+      try { remoteDatabaseVersions[repo] = await repositoryVersion(repo); }
+      catch (error) { remoteDatabaseVersions[repo] = {error:error.message}; }
+    }));
+    renderDatabaseVersions();
+  }
+  function mergeNameDatabase(previous,fresh) {
+    if (previous?.schemaVersion !== 2) return fresh;
+    const db = structuredClone(previous);
+    for (const [id,record] of Object.entries(fresh.records)) {
+      const old = db.records[id];
+      db.records[id] = {names:{...old?.names,...record.names},aliases:[...new Set([...(old?.aliases || []),...Object.values(old?.names || {})])]};
+    }
+    db.items = {};
+    for (const [id,record] of Object.entries(db.records)) for (const name of [...Object.values(record.names),...(record.aliases || [])]) {
+      const key = normalizeItemName(name); const ids = db.items[key] ||= []; if (!ids.includes(id)) ids.push(id);
+    }
+    db.languages = {...db.languages,...fresh.languages};
+    return db;
+  }
+  async function downloadNameDatabase(version) {
+    const texts = {};
+    await Promise.all(['chs','en','ja','fr','de'].map(async lang => {
+      const file = await githubJson('https://api.github.com/repos/' + ITEM_REPO + '/contents/' + lang + '/Item.csv?ref=' + version.sha);
+      const blob = await githubJson('https://api.github.com/repos/' + ITEM_REPO + '/git/blobs/' + file.sha);
+      if (blob.encoding !== 'base64') throw new Error('名稱檔格式錯誤');
+      texts[lang] = new TextDecoder().decode(Uint8Array.from(atob(blob.content),c=>c.charCodeAt(0)));
+    }));
+    return buildDatabase(texts,version);
+  }
+  async function syncDatabasePart(repo,version,progress) {
+    const previous = getCustomDatabase(); let db;
+    if (repo === ITEM_REPO) db = mergeNameDatabase(previous,await downloadNameDatabase(version));
+    else if (repo === TEAMCRAFT_REPO) {
+      const pack = await downloadTeamcraftData(progress,version);
+      db = buildTeamcraftDatabase(pack.data,version,previous);
+    } else {
+      if (previous?.schemaVersion !== 2) throw new Error('需先安裝主庫或來源庫');
+      const base = 'https://raw.githubusercontent.com/' + repo + '/' + version.sha + '/src/LuminaSupplemental.Excel/Generated/';
+      const entries = await Promise.all(SOURCE_FILES.map(async file=>[file,await fetchText(base + file + '.csv')]));
+      const licenseText = await fetchText('https://raw.githubusercontent.com/' + repo + '/' + version.sha + '/LICENSE');
+      if (!licenseText.trim()) throw new Error('副庫授權資料為空');
+      db = structuredClone(previous);
+      let duties = {};
+      const main = previous.provenance.find(p=>p.repo === ITEM_REPO);
+      if (main?.commit) {
+        const csv = await fetchText('https://raw.githubusercontent.com/' + ITEM_REPO + '/' + main.commit + '/chs/ContentFinderCondition.csv');
+        duties = Object.fromEntries(readSheet(csv,['Name']).map(row=>[row.id,row.Name]));
+      }
+      const supplemental = buildSources(Object.fromEntries(entries),duties);
+      for (const [id,list] of Object.entries(db.sources)) {
+        db.sources[id] = list.filter(source=>source.provider !== 'LuminaSupplemental');
+        if (!db.sources[id].length) delete db.sources[id];
+      }
+      for (const [id,list] of Object.entries(supplemental)) if (db.records[id] && !db.sources[id]) db.sources[id] = list;
+      db.provenance = db.provenance.filter(p=>p.repo !== repo);
+      db.provenance.push({repo,commit:version.sha,license:'GPL-3.0',licenseText,files:SOURCE_FILES});
+    }
+    const provenance = db.provenance.find(p=>p.repo === repo) || {repo};
+    Object.assign(provenance,{commit:version.sha,label:version.label,dataDate:version.date,gameVersion:version.gameVersion,gameVersionBasis:version.gameVersionBasis,fetchedAt:new Date().toISOString()});
+    db.provenance = db.provenance.filter(p=>p.repo !== repo); db.provenance.push(provenance);
+    db.version = {label:'三庫整合',date:new Date().toISOString()};
+    db.updatedAt = new Date().toISOString();
+    await saveDatabaseToIDB(db);
+    return db;
+  }
+  async function syncAllDatabases() {
+    if (databaseSyncBusy) return;
+    databaseSyncBusy = true;
+    const buttons = document.querySelectorAll('#dbModal button[data-sync]');
+    buttons.forEach(button=>button.disabled=true);
+    const progress = (text,percent) => {
+      document.getElementById('syncProgressBox').style.display='block';
+      document.getElementById('syncStepText').innerText=text;
+      document.getElementById('syncPercentText').innerText=percent+'%';
+      document.getElementById('syncProgressBar').style.width=percent+'%';
+    };
+    const failures=[];
+    try {
+      await prepareDatabaseDirectory();
+      for (const [index,{repo,name}] of DATABASE_REPOS.entries()) {
+        try {
+          progress('檢查 ' + name,index*30);
+          const version = await repositoryVersion(repo);
+          remoteDatabaseVersions[repo] = version;
+          const installed = getCustomDatabase()?.provenance?.find(p=>p.repo === repo);
+          if (installed?.commit === version.sha) {
+            if (!installed.label || !installed.dataDate || (!installed.gameVersion && version.gameVersion)) {
+              const db = structuredClone(getCustomDatabase());
+              Object.assign(db.provenance.find(p=>p.repo === repo),{label:version.label,dataDate:version.date,gameVersion:version.gameVersion,gameVersionBasis:version.gameVersionBasis});
+              await saveDatabaseToIDB(db);
+            }
+            progress(name + ' 已最新，略過下載。',index*30+25); continue;
+          }
+          progress('同步 ' + name,index*30+5);
+          await syncDatabasePart(repo,version,(text)=>progress(name+'：'+text,index*30+15));
+          initDatabaseState();
+        } catch (error) { failures.push(name+'：'+error.message); }
+      }
+      const db = getCustomDatabase();
+      const fileStatus = db ? await saveDatabaseFile(db) : '尚未安裝任何庫。';
+      progress(failures.length ? '部分未完成，再按一鍵同步只重試未完成的庫。' : '三庫已最新。',failures.length ? 90 : 100);
+      document.getElementById('syncStepText').innerText += ' ' + fileStatus;
+      if (failures.length) alert('以下資料庫未完成，已成功的庫會保留：\n'+failures.join('\n'));
+      if (currentOutfitData && db) renderResult(currentOutfitData);
+    } catch(error) { progress('同步未開始：'+error.message,0); }
+    finally { databaseSyncBusy=false;buttons.forEach(button=>button.disabled=false);renderDatabaseVersions(); }
+  }
+  // === [SECTION: JS_UNIFIED_DATABASE_SYNC] END ===
+
+  function handleCsvFileSelect(event) {
+    if (event.target.files[0]) processLocalCsvFile(event.target.files[0]);
+    event.target.value = '';
+  }
+
+  async function processLocalCsvFile(file) {
+    if (databaseSyncBusy) { showToast("同步進行中，請稍後匯入"); return; }
+    try {
+      const text = await file.text();
+      let db;
+      if (/\.json$/i.test(file.name)) db = validateDatabase(JSON.parse(text));
+      else {
+        const lang = document.getElementById('csvLanguage').value;
+        db = buildDatabase({[lang]:text},{sha:'local',label:'本機 ' + lang + ' CSV',date:new Date().toISOString().slice(0,10)});
+      }
+      await saveDatabaseToIDB(db);
+      initDatabaseState();
+      if (currentOutfitData) renderResult(currentOutfitData);
+      showToast('✅ 資料庫匯入完成');
+      closeDbModal();
+    } catch (err) { alert('匯入失敗，原資料庫未替換：' + err.message); }
+  }
+
+  async function resetToDefaultDb() {
+    if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
+    if (!confirm('清除 v2.3.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    try {
+      const db = await openItemDatabase();
+      try {
+        await new Promise((resolve,reject) => {
+          const tx = db.transaction(IDB_STORE,'readwrite');
+          tx.objectStore(IDB_STORE).delete('custom_dict');
+          tx.oncomplete = resolve;
+          tx.onerror = tx.onabort = () => reject(tx.error);
+        });
+      } finally { db.close(); }
+    } catch (err) { alert('清除失敗：' + err.message); return; }
+    localStorage.removeItem('ff14_custom_items_dict_220');
+    cachedCustomDb = null;
+    wikiSearchCache.clear();
+    initDatabaseState();
+    if (currentOutfitData) renderResult(currentOutfitData);
+  }
+  // === [SECTION: JS_SYNC_ENGINE] END ===
+
+  // === [SECTION: JS_UPLOAD_HANDLERS] START ===
+
+
+  function triggerFileInput() {
+    document.getElementById("fileInput").click();
+  }
+
+  function setupDropZone() {
+    const dropZone = document.getElementById("dropZone");
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+      document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        processFile(files[0]);
+      }
+    });
+  }
+
+  function setupClipboardPaste() {
+    window.addEventListener("paste", (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let item of items) {
+        if (item.type.indexOf("image") !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            processFile(file);
+            showToast("📸 已自動讀取剪貼簿截圖！");
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleFileSelect(event) {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      processFile(files[0]);
+    }
+  }
+
+  let imageRequestBusy = false;
+  async function processFile(file) {
+    if (imageRequestBusy) { showToast('正在辨識，請完成後再加入下一張圖片'); return; }
+    if (file.type && !file.type.startsWith('image/')) { showToast('請選擇圖片檔案'); return; }
+    if (!getApiKey()) { openKeyModal(); return; }
+    imageRequestBusy = true;
+    try {
+      const mime = file.type || 'image/jpeg';
+      const dataUrl = await new Promise((resolve,reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(reader.error || new Error('無法讀取圖片'));
+        reader.readAsDataURL(file);
+      });
+      document.getElementById('previewImg').src = dataUrl;
+      currentImageBase64 = dataUrl.split(',')[1];
+      currentImageMime = mime;
+      await callVisionAI(currentImageBase64,mime);
+    } catch (err) { alert('圖片處理失敗：' + err.message); }
+    finally { imageRequestBusy = false; }
+  }
+  // === [SECTION: JS_UPLOAD_HANDLERS] END ===
+
+  // === [SECTION: JS_AI_DISPATCHER] START ===
+
+  function getUnifiedSystemPrompt() {
+    return `你是一名精通《最終幻想14》（Final Fantasy XIV / FF14）全裝備數據庫與幻化穿搭風格的專家。
+這是一張玩家分享的幻化穿搭展示卡片。
+
+請嚴格遵循以下【全語系統一辨識核心規範】：
+1. 【忠實讀取卡片原文，嚴禁腦補與擅自轉換】：
+   - 【卡片外語原名 (name_en_jp，英文／日文／法文／德文)】：
+     * 若卡片上有印製英文、日文、法文或德文名稱，請一字不漏、精準拼寫讀取，填入 name_en_jp（格式：英文原名 / 日文原名，例如：Idealized Arbatel Bottoms / アイディアル・アルバテルボトム、Augmented Forgeking's Boots / フォージキングブーツRE）。
+     * 若卡片【完全沒有】外語原名（如純中文卡片），【絕對禁止自行翻譯或想像假英文】，name_en_jp 必須直接填寫「無」！
+   - 【裝備名稱 (name_zh)】：
+     * 若卡片為繁體中文（如：光之幻化館），請 100% 忠實保留卡片繁體原文（例如：二號B型高筒靴、改良型水晶都精準眼罩、斯卡拉精準長衣），【嚴禁擅自簡繁互轉】或篡改名詞！
+     * 若卡片為簡體中文、韓文或其他語言，請 100% 忠實保留卡片上的語言原文。
+     * 若卡片為純外語（無中文），可在 name_zh 填入對應的標準繁體中文譯名。
+
+2. 【染色與取得途徑】：
+   - 染色：若有標註染劑名稱或色號，請填寫（如：砲鋼黑染劑、煤玉黑染劑、或 ①色號 / ②色號；若無則填寫未染色）。
+   - 取得途徑：請根據裝備類型客觀填寫（如：副本掉落、無人島兌換、特職任務、生產製作、金碟遊樂場或商城購買等）。【嚴禁盲目將所有漂亮外觀猜測為商城購買】，若非100%確定請客觀填寫玩法類別或填寫「查閱灰機wiki」。
+
+3. 【穿搭注意事項】：
+   - 若混用了不同生產/採集職業或戰鬥特職專屬裝備（AF裝），請在 note 中特別註明投影時的職業限制提示。
+
+請務必以繁體中文與嚴格 JSON 格式輸出，不得輸出額外解釋或非 JSON 內容。格式範例：
+{
+  "outfit_title": "套裝風格標題",
+  "note": "穿搭特色或投影職業限制提示",
+  "items": [
+    {
+      "slot": "部位（頭部、身體、手部、腿部、腳部、耳飾）",
+      "name_zh": "卡片上的名稱原文（繁中卡片100%保留繁中，簡中/韓文卡片100%保留原文）",
+      "name_en_jp": "卡片上的英文／日文／法文／德文原名（無外語原名填「無」，禁止自行翻譯）",
+      "source": "取得途徑（商城購買、副本掉落、NPC兌換等）",
+      "dye": "染色設定（照抄卡片上的色號名稱，如 シェールブラウン、Kobold Brown、素雪白 或 未染色）"
+    }
+  ]
+}`;
+  }
+
+  // 統一視覺 AI 調度核心 (支援 Google Gemini、OpenAI、OpenRouter / 自訂接口)
+  async function callVisionAI(base64Data, mimeType) {
+    const provider = getActiveProvider();
+    if (provider === "openai") {
+      const key = localStorage.getItem("ff14_openai_api_key") || "";
+      await callOpenAICompatibleAPI(base64Data, mimeType, key, "gpt-4o-mini", "https://api.openai.com/v1");
+    } else if (provider === "custom") {
+      const key = localStorage.getItem("ff14_custom_api_key") || "";
+      const baseUrl = localStorage.getItem("ff14_custom_base_url") || "https://openrouter.ai/api/v1";
+      const model = localStorage.getItem("ff14_custom_model") || "openai/gpt-4o-mini";
+      await callOpenAICompatibleAPI(base64Data, mimeType, key, model, baseUrl);
+    } else {
+      const key = localStorage.getItem("ff14_gemini_api_key") || "";
+      await callGeminiAPI(base64Data, mimeType, key);
+    }
+  }
+
+  // OpenAI 相容介面調用器 (支援 OpenAI、OpenRouter、OneAPI、自建 API)
+  async function callOpenAICompatibleAPI(base64Data, mimeType, apiKey, modelName, baseUrl) {
+    const loadingBox = document.getElementById("loadingBox");
+    const resultSection = document.getElementById("resultSection");
+    const loadingMsg = document.getElementById("loadingMsg");
+    const statusLogList = document.getElementById("statusLogList");
+
+    loadingBox.style.display = "block";
+    resultSection.style.display = "none";
+    statusLogList.innerHTML = "";
+
+    const cleanBaseUrl = (baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, '');
+    const endpoint = cleanBaseUrl.endsWith("/chat/completions") ? cleanBaseUrl : `${cleanBaseUrl}/chat/completions`;
+
+    appendStatusLog("連線中", `正在連線至 ${modelName} (${cleanBaseUrl})...`, "info");
+    loadingMsg.innerText = `正在透過 ${modelName} 辨識圖片裝備與染色...`;
+
+    const promptText = getUnifiedSystemPrompt();
+
+    const payload = {
+      model: modelName,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: promptText },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Data}`
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1
+    };
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+          "HTTP-Referer": window.location.href,
+          "X-Title": "FF14 Glamour OCR Tool"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${errText.substring(0, 250)}`);
+      }
+
+      const resData = await resp.json();
+      const content = resData.choices?.[0]?.message?.content;
+      if (!content) throw new Error("API 回傳內容為空");
+
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith("```json")) {
+        cleanContent = cleanContent.replace(/^```json\s*/i, "").replace(/\s*```$/, "");
+      } else if (cleanContent.startsWith("```")) {
+        cleanContent = cleanContent.replace(/^```\s*/, "").replace(/\s*```$/, "");
+      }
+
+      const parsedData = JSON.parse(cleanContent);
+      appendStatusLog("解析成功", `已成功自 ${modelName} 獲取裝備數據！`, "success");
+      loadingBox.style.display = "none";
+      renderResult(parsedData);
+      currentOutfitData = parsedData;
+      showToast("🎉 幻化外觀辨識成功！");
+    } catch (err) {
+      loadingBox.style.display = "none";
+      appendStatusLog("呼叫異常", err.message, "warn");
+      alert(`❌ 呼叫 ${modelName} 失敗：\n${err.message}\n\n💡 若為跨域 (CORS) 錯誤，建議改用 OpenRouter (https://openrouter.ai/api/v1) 作為中轉接口。`);
+    }
+  }
+
+  function appendStatusLog(badgeText, msgText, type = "info") {
+    const logList = document.getElementById("statusLogList");
+    if (!logList) return;
+    
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    
+    const item = document.createElement("div");
+    item.className = "log-item";
+    item.innerHTML = `
+      <span class="log-time">[${timeStr}]</span>
+      <span class="log-badge ${type}">${badgeText}</span>
+      <span class="log-text">${escapeHtml(msgText)}</span>
+    `;
+    logList.appendChild(item);
+    
+    const consoleBox = document.getElementById("statusConsole");
+    if (consoleBox) {
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+  }
+
+  // 3. 呼叫 Gemini API (多模型備用機制與即時狀態日誌)
+  async function callGeminiAPI(base64Data, mimeType, apiKey) {
+    const loadingBox = document.getElementById("loadingBox");
+    const resultSection = document.getElementById("resultSection");
+    const loadingMsg = document.getElementById("loadingMsg");
+    const statusLogList = document.getElementById("statusLogList");
+
+    loadingBox.style.display = "block";
+    resultSection.style.display = "none";
+    statusLogList.innerHTML = "";
+
+    appendStatusLog("準備中", "已讀取截圖資料，正在連線至 Gemini Vision 模型...", "info");
+
+    const modelsToTry = [
+      "gemini-3.5-flash-lite",    // 每天 500 次！RPM 15，極速且額度高達 25 倍！
+      "gemini-3.1-flash-lite",    // 每天 500 次！RPM 15，雙重保障
+      "gemini-flash-lite-latest", // 最新輕量模型 (500 次/天)
+      "gemini-3.5-flash",         // 備援標準模型 (20 次/天)
+      "gemini-3.6-flash",         // 備援模型 (20 次/天)
+      "gemini-3.7-flash",         // 備援模型 (20 次/天)
+      "gemini-3.8-flash"          // 備援模型 (20 次/天)
+    ];
+
+    const responseSchema = {
+      type: "OBJECT",
+      properties: {
+        outfit_title: { type: "STRING", description: "套裝風格標題" },
+        note: { type: "STRING", description: "穿搭特色或投影職業限制警告" },
+        items: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              slot: { type: "STRING", description: "部位（頭部、身體、手部、腿部、腳部、耳飾）" },
+              name_zh: { type: "STRING", description: "繁體中文常用外觀名稱（如：東方女生髮帶、男爵外套、理想化的古術打底褲）" },
+              name_huiji: { type: "STRING", description: "灰機wiki精確官方條目名稱（簡體中文官方全名，用於直連 wiki/物品:名稱，例如：东方女生发带、男爵外套、理想化的古术打底裤、特制女仆发带、雀翎巧匠及膝裤、理想巫术外套、占星臂套、烹调师护腿、宫廷恋人强攻耳饰）" },
+              name_en_jp: { type: "STRING", description: "圖片上的英文、日文、法文或德文原名，禁止自行翻譯" },
+              source: { type: "STRING", description: "取得途徑（副本等級、NPC工票/軍票、商城、博姿雅堡壘追憶戰）" },
+              dye: { type: "STRING", description: "染色設定（如 ①色號 / ②色號 或 未染色）" }
+            },
+            required: ["slot", "name_zh", "name_huiji", "name_en_jp", "source", "dye"]
+          }
+        }
+      },
+      required: ["outfit_title", "items", "note"]
+    };
+
+    const promptText = getUnifiedSystemPrompt();
+
+    const payload = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType, data: base64Data } },
+          { text: promptText }
+        ]
+      }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: responseSchema,
+        temperature: 0.1
+      }
+    };
+
+    const startTime = Date.now();
+    const MAX_WAIT_MS = 180000; // 3 分鐘 (180 秒) 自動輪詢重試上限
+
+    let round = 1;
+    let lastError = "";
+
+    while (Date.now() - startTime < MAX_WAIT_MS) {
+      const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+      if (round > 1) {
+        appendStatusLog("輪詢排隊", `🔄 發動第 ${round} 輪請求（已排隊等待 ${elapsedSec} 秒 / 3分鐘上限）...`, "info");
+      }
+
+      for (let model of modelsToTry) {
+        if (Date.now() - startTime >= MAX_WAIT_MS) break;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        try {
+          const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
+          loadingMsg.innerText = `[已排隊 ${currentElapsed}s / 3分上限] 正在連線 ${model} 讀取外觀...`;
+          appendStatusLog("嘗試連線", `正在連線至模型：${model} ...`, "info");
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const resJson = await response.json();
+            if (resJson.candidates && resJson.candidates.length > 0) {
+              appendStatusLog("解析成功", `🎉 模型 ${model} 連線成功！正在索引資料庫並繪製卡片...`, "success");
+              const rawText = resJson.candidates[0].content.parts[0].text;
+              const parsedData = JSON.parse(rawText);
+              renderResult(parsedData);
+              currentOutfitData = parsedData;
+              loadingBox.style.display = "none";
+              return;
+            }
+          } else {
+            const errData = await response.json().catch(() => ({}));
+            const errMsg = errData.error?.message || response.statusText;
+            lastError = `${model}: ${response.status} - ${errMsg}`;
+            
+            if (response.status === 503) {
+              appendStatusLog("伺服器繁忙", `⚠️ ${model} 尖峰負載過高 (503)，排隊自動切換...`, "warn");
+            } else {
+              appendStatusLog("連線重試", `⚠️ ${model} 回應異常 (Status ${response.status})，自動切換...`, "warn");
+            }
+          }
+        } catch (err) {
+          clearTimeout(timeoutId);
+          lastError = err.message;
+          if (err.name === 'AbortError') {
+            appendStatusLog("連線逾時", `⚠️ ${model} 超時無回應，切換下一個...`, "warn");
+          } else {
+            appendStatusLog("連線異常", `⚠️ ${model} 連線失敗 (${err.message})`, "warn");
+          }
+        }
+      }
+
+      round++;
+      const currentElapsed = Math.floor((Date.now() - startTime) / 1000);
+      if (Date.now() - startTime < MAX_WAIT_MS) {
+        appendStatusLog("尖峰冷卻", `⏳ 伺服器尖峰暫時堵塞，冷卻 4 秒後自動從 3.5 再次輪詢（已等待 ${currentElapsed}s）...`, "warn");
+        loadingMsg.innerText = `[已等待 ${currentElapsed}s / 3分上限] Google 尖峰排隊中，4秒後自動重試...`;
+        await new Promise(r => setTimeout(r, 4000));
+      }
+    }
+
+    loadingBox.style.display = "none";
+    alert(`❌ 已自動排隊重試滿 3 分鐘，所有伺服器均處於尖峰高負載狀態。\n最新錯誤：${lastError}\n\n💡 Google 尖峰擁塞通常持續幾分鐘，請稍候片刻再試。`);
+  }
+
+  // === [SECTION: JS_AI_DISPATCHER] END ===
+
+  // ==============================================================================
+  // === [SECTION: JS_EQUIPMENT_RESOLVER] START ===
+  // ==============================================================================
+  // 全語系統一瀑布流解析核心（英文 ➔ 日文 ➔ 繁簡中文/各國語言原文）
+  // 每一級統一遵循：優先查詢官方同步大庫 ➔ 未收錄則鴨鴨好手氣 (!ducky) 嘗試開啟灰機條目！
+  let wikiRenderGeneration = 0;
+  const wikiSearchCache = new Map();
+
+  function equipmentNames(item) {
+    return [...new Set([...(item.name_en_jp || '').split('/'),item.name_zh,item.name_huiji]
+      .filter(n => typeof n === 'string' && n.trim() && !/^(無|none|null|n\/a)$/i.test(n.trim())).map(n => n.trim()))];
+  }
+
+  // === [SECTION: JS_FUZZY_MATCH] START ===
+  // OpenCC TSCharacters subset, Apache-2.0; character folding only, never official name translation.
+  const CHARACTER_FOLDING_PAIRS = "乾干亂乱亞亚佈布佔占來来侶侣係系俠侠俬私倖幸倫伦偉伟偽伪傑杰傘伞備备傢家傭佣傳传傷伤僕仆僞伪儀仪儘尽優优儲储兇凶兒儿內内冑胄凈净凜凛凱凯剋克剎刹剛刚創创劃划劄札劍剑勁劲動动務务勝胜勞劳厤历參参叢丛吒咤員员唸念啓启啞哑啟启喚唤喬乔單单嗶哔嘯啸嘰叽噁恶噹当嚮向嚴严囌苏國国圍围園园圓圆圖图團团埰采執执堅坚場场塊块塗涂塵尘墊垫墜坠墮堕壘垒壞坏壯壮壺壶壽寿夢梦夥伙夾夹奧奥奪夺姦奸婭娅孃娘學学宮宫寀采寢寝實实寧宁審审寬宽寶宝將将專专對对導导屬属岡冈峯峰島岛嵐岚巔巅巖岩師师帶带幫帮幹干幾几庫库廚厨廠厂弔吊強强彈弹彌弥彎弯彔录彫雕後后復复徵征徹彻恆恒悅悦惡恶惻恻愛爱慄栗慶庆慾欲憑凭憤愤憫悯憶忆懞蒙懲惩懶懒懷怀懸悬懼惧戀恋戰战戲戏戶户拋抛捲卷掛挂採采揮挥損损搖摇搧扇摺折撐撑撥拨撫抚擊击擔担擺摆擾扰敎教敗败敘叙敵敌數数斬斩斷断於于旂旗昇升時时暘旸曆历曉晓曏向書书會会朧胧朮术東东査查桿杆條条梟枭棄弃楓枫業业極极榘矩榦干榮荣槍枪樂乐標标樸朴樹树樺桦機机橢椭橫横櫃柜櫚榈櫸榉櫻樱欅榉權权欖榄歐欧歡欢歷历殘残殺杀殻壳殼壳毆殴氈毡氣气決决沖冲涼凉淨净淩凌淵渊淺浅渦涡渾浑湧涌準准溝沟溫温滅灭滿满漁渔漢汉潔洁潛潜潰溃澤泽濃浓濛蒙濱滨瀋沈瀰弥灘滩災灾烏乌無无煉炼煙烟煥焕煬炀熱热熾炽燈灯燒烧營营燭烛燻熏爍烁爛烂爭争爾尔牽牵狀状狹狭猙狰獄狱獅狮獨独獰狞獲获獵猎獷犷獸兽現现琱雕瑪玛環环璽玺瓔璎畝亩畢毕畫画異异畵画當当瘋疯瘡疮療疗癒愈發发皺皱盃杯盜盗盡尽監监盤盘盧卢眞真眾众矇蒙硃朱碼码磚砖礦矿祕秘禍祸禦御禮礼禱祷種种穀谷積积穫获竪竖競竞筆笔箏筝箚札節节簑蓑籠笼糧粮糰团約约紅红紋纹納纳紐纽純纯紗纱級级紡纺紮扎細细紳绅紵纻終终絃弦絆绊結结絕绝絞绞絨绒統统絲丝絳绛絶绝絹绢綁绑綉绣經经綠绿綢绸綫线維维綱纲網网綳绷綵彩綺绮綿绵緊紧緋绯緑绿緒绪線线緞缎編编緩缓練练緹缇縫缝縴纤總总繃绷織织繞绕繡绣繩绳繪绘繫系繭茧繼继纏缠纔才纖纤缽钵罰罚羅罗羈羁羣群義义習习翫玩翹翘聖圣聞闻聯联職职聽听脈脉脛胫脩修腦脑腳脚膠胶膽胆與与興兴舊旧舘馆艦舰艱艰艷艳茲兹荊荆莊庄華华菸烟萊莱萬万葉叶蒼苍蓆席蓋盖蓮莲蔔卜蔘参蔥葱蕓芸蕪芜薔蔷薩萨薹苔藍蓝藝艺藴蕴蘇苏蘊蕴蘭兰虛虚號号蝕蚀螢萤蟲虫蠍蝎蠟蜡蠻蛮衆众術术衕同衚胡衛卫衝冲袞衮袷夹裏里裝装裡里製制複复褌裈褲裤襪袜襬摆襯衬襲袭見见規规視视親亲覺觉觀观訂订訓训託托記记設设註注証证詐诈詠咏詩诗話话誇夸誌志誕诞語语誠诚說说説说誼谊調调論论諫谏諸诸諾诺謝谢謠谣謡谣證证識识譜谱護护譽誉讀读變变讚赞豎竖豐丰豔艳豬猪貓猫貝贝負负貢贡貫贯貴贵費费貼贴貿贸賀贺賊贼賜赐賢贤賦赋質质賭赌賽赛贊赞趕赶跡迹踴踊蹟迹躍跃車车軍军軟软輔辅輕轻輝辉輦辇輪轮轉转轟轰辭辞辯辩農农迴回連连進进遊游運运過过達达遠远遶绕選选遼辽邊边邏逻郵邮醜丑醣糖醫医釋释釕钌釘钉針针釣钓釤钐釦扣鈀钯鈅钥鈍钝鈎钩鈞钧鈡钟鈦钛鈴铃鈷钴鈿钿鉅巨鉆钻鉍铋鉗钳鉚铆鉛铅鉢钵鉤钩鉬钼鉻铬銀银銃铳銅铜銘铭銳锐銼锉鋁铝鋒锋鋤锄鋭锐鋯锆鋰锂鋸锯鋼钢錄录錐锥錘锤錦锦錨锚錫锡録录錳锰錶表鍊炼鍋锅鍍镀鍛锻鍬锹鍼针鍾钟鎌镰鎖锁鎚锤鎢钨鎧铠鎬镐鎭镇鎮镇鏇旋鏈链鏡镜鏢镖鏤镂鐘钟鐮镰鐲镯鐵铁鐺铛鑄铸鑌镔鑞镴鑣镳鑰钥鑲镶鑽钻長长門门閃闪開开閑闲閒闲間间閤合閥阀閱阅閲阅閻阎闆板闇暗闊阔關关陞升陣阵陰阴陸陆陽阳隊队隕陨際际險险隱隐雙双雛雏雞鸡離离雲云電电霧雾靂雳靈灵靜静鞦秋韆千韋韦韌韧韻韵頂顶項项須须頌颂預预頓顿領领頜颌頭头頰颊頸颈顆颗額额願愿類类顯显顱颅風风飄飘飛飞飪饪飾饰餅饼養养餓饿餘余館馆餾馏饒饶饞馋馬马馭驭馴驯駐驻駒驹駕驾駛驶駝驼駿骏騎骑騰腾驅驱驕骄驚惊驟骤髏髅體体髮发鬆松鬍胡鬚须鬥斗鬱郁魚鱼魯鲁鮮鲜鯊鲨鯨鲸鯰鲶鰐鳄鱗鳞鱷鳄鳥鸟鳳凤鳴鸣鳶鸢鴉鸦鴨鸭鵑鹃鵠鹄鵰雕鵲鹊鶯莺鶴鹤鷄鸡鷲鹫鷹鹰鸚鹦麗丽麪面麫面麯曲麴曲麵面黃黄點点鼕冬鼴鼹齊齐齋斋齒齿齣出龍龙龜龟";
+  const characterFolding = new Map();
+  for(let i=0;i<CHARACTER_FOLDING_PAIRS.length;i+=2) characterFolding.set(CHARACTER_FOLDING_PAIRS[i],CHARACTER_FOLDING_PAIRS[i+1]);
+  function comparisonName(name) {
+    return [...normalizeItemName(name)].map(c=>characterFolding.get(c)||c).join('');
+  }
+  const OCR_SIMILAR_GROUPS = ['熟热','己已巳','土士','未末','日曰','目日','口囗','人入','千干','冶治','ロ口','カ力','エ工','ニ二','シツ','ソン'];
+  function weightedNameDistance(a,b,maxEdits=2) {
+    if(Math.abs(a.length-b.length)>maxEdits)return null;
+    let previous=Array.from({length:b.length+1},(_,j)=>Array.from({length:maxEdits+1},(_,e)=>e===j?j*100:Infinity));
+    for(let i=1;i<=a.length;i++) {
+      const row=Array.from({length:b.length+1},()=>Array(maxEdits+1).fill(Infinity));
+      if(i<=maxEdits)row[0][i]=i*100;
+      for(let j=Math.max(1,i-maxEdits);j<=Math.min(b.length,i+maxEdits);j++) {
+        const same=a[i-1]===b[j-1];
+        const cost=same?0:OCR_SIMILAR_GROUPS.some(g=>g.includes(a[i-1])&&g.includes(b[j-1]))?35:100;
+        for(let e=0;e<=maxEdits;e++) {
+          row[j][e]=same?previous[j-1][e]:e?previous[j-1][e-1]+cost:Infinity;
+          if(e)row[j][e]=Math.min(row[j][e],previous[j][e-1]+100,row[j-1][e-1]+100);
+        }
+      }
+      previous=row;
+    }
+    const costs=previous[b.length];const cost=Math.min(...costs);
+    return Number.isFinite(cost)?{cost,edits:costs.indexOf(cost)}:null;
+  }
+  function oneCharacterDifference(a,b) { return weightedNameDistance(a,b,1)?.edits===1; }
+  function nameLanguage(name) { return /[\u3040-\u30ff]/.test(name)?'ja':/[\u3400-\u9fff]/.test(name)?'zh':'latin'; }
+  function protectedEquipmentWords(name) {
+    return (name.match(/治愈|治疗|咏唱|强袭|精准|御敌|制敌|游击|healing|casting|fending|aiming|striking|scouting|maiming|augmented/g)||[]).sort().join('|');
+  }
+  let fuzzyDatabaseReference,fuzzyNameBuckets,fuzzyResultCache;
+  function fuzzyEquipmentMatch(names,db) {
+    if(fuzzyDatabaseReference!==db) {
+      fuzzyDatabaseReference=db;fuzzyNameBuckets=new Map();fuzzyResultCache=new Map();
+      for(const name of Object.keys(db.items)) {
+        const folded=comparisonName(name);const key=nameLanguage(name)+':'+folded.length;
+        const bucket=fuzzyNameBuckets.get(key)||[];bucket.push({name,folded,sorted:[...folded].sort().join('')});fuzzyNameBuckets.set(key,bucket);
+      }
+    }
+    const cacheKey=JSON.stringify(names);
+    if(fuzzyResultCache.has(cacheKey))return fuzzyResultCache.get(cacheKey);
+    const matches=new Map();
+    for(const raw of names) {
+      const query=comparisonName(raw),language=nameLanguage(raw);
+      const querySorted=[...query].sort().join('');
+      if(query.length<(language==='latin'?8:5))continue;
+      const maxEdits=query.length>=(language==='latin'?12:10)?2:1;
+      for(let size=query.length-maxEdits;size<=query.length+maxEdits;size++) {
+        for(const {name,folded,sorted} of fuzzyNameBuckets.get(language+':'+size)||[]) {
+          let qi=0,ci=0,common=0;
+          while(qi<querySorted.length && ci<sorted.length) {
+            if(querySorted[qi]===sorted[ci]){common++;qi++;ci++;}
+            else if(querySorted[qi]<sorted[ci])qi++;else ci++;
+          }
+          if(Math.max(query.length,folded.length)-common>maxEdits)continue;
+          const queryRole=protectedEquipmentWords(query),candidateRole=protectedEquipmentWords(folded);
+          if(queryRole && candidateRole && queryRole!==candidateRole)continue;
+          const distance=weightedNameDistance(query,folded,maxEdits);
+          if(!distance || distance.cost>Math.min(200,query.length*20))continue;
+          for(const id of db.items[name]) {
+            const old=matches.get(id);
+            if(!old || distance.cost<old.cost)matches.set(id,{id,original:raw,matchedName:name,...distance});
+          }
+        }
+      }
+    }
+    const ranked=[...matches.values()].sort((a,b)=>a.cost-b.cost);
+    const best=ranked[0];
+    // A clear margin is required; an equal or similarly plausible item remains unresolved.
+    const result=best && (!ranked[1] || ranked[1].cost-best.cost>=60)
+      ? {...best,names:db.records[best.id].names,matchType:'fuzzy',matchBasis:best.edits===0?'字形輔助':'加權錯字'} : null;
+    if(fuzzyResultCache.size>=1000)fuzzyResultCache.clear();
+    fuzzyResultCache.set(cacheKey,result);return result;
+  }
+  // === [SECTION: JS_FUZZY_MATCH] END ===
+
+
+  function matchedEquipmentExportName(item,fallback) {
+    const match = matchEquipment(item);
+    const name = match?.names.tc || fallback;
+    return match?.matchType === 'fuzzy' ? name + '（疑似匹配；原辨識：' + match.original + '）' : name;
+  }
+
+  function matchEquipment(item) {
+    const db = getCustomDatabase();
+    if (!db) return null;
+    const names = equipmentNames(item);
+    if (db.schemaVersion === 2) {
+      const candidates = names.map(n => Object.hasOwn(db.items,normalizeItemName(n)) ? db.items[normalizeItemName(n)] : null).filter(Boolean);
+      if (!candidates.length) return fuzzyEquipmentMatch(names,db);
+      const common = candidates.reduce((ids,next) => ids.filter(id => next.includes(id)));
+      if (common.length !== 1) return null;
+      const id = common[0];
+      return {id,names:db.records[id].names,matchType:'exact'};
+    }
+    for (const n of names) {
+      const zh = db.items[n] || db.items[n.toLowerCase()];
+      if (typeof zh === 'string') return {names:{chs:zh}};
+    }
+    return null;
+  }
+
+  function wikiSearchTerm(item) {
+    const match = matchEquipment(item);
+    return match?.names.chs || item.name_huiji || item.name_zh || equipmentNames(item)[0] || '';
+  }
+
+  function wikiSearchInfo(item, pending = false, failed = false) {
+    const query = wikiSearchTerm(item);
+    return {url:'https://ff14.huijiwiki.com/wiki/Special:Search?search=' + encodeURIComponent(query),
+      pending,isLucky:false,label:pending ? '⏳ 查詢灰機中' : '🔍 灰機站內搜尋',
+      tooltip:failed ? '預查失敗，可點擊開啟灰機站內搜尋' : '在灰機搜尋此裝備'};
+  }
+
+  function getHuijiWikiUrl(item) {
+    if (item._wikiInfo) return item._wikiInfo;
+    const match = matchEquipment(item);
+    delete item.resolved_name;
+    if (match?.names.chs) {
+      item.resolved_name = match.names.chs;
+      return {url:'https://ff14.huijiwiki.com/wiki/' + encodeURIComponent('物品:' + match.names.chs),
+        pending:false,isLucky:false,label:match.matchType === 'fuzzy' ? '🔗 灰機（疑似）' : '🔗 灰機直達',tooltip:(match.matchType === 'fuzzy' ? '模糊匹配，請確認：物品:' : '名稱庫精確匹配：物品:') + match.names.chs};
+    }
+    return wikiSearchInfo(item,true);
+  }
+
+  async function precheckWiki(item) {
+    const query = wikiSearchTerm(item).trim();
+    if (!query) return wikiSearchInfo(item,false,true);
+    if (wikiSearchCache.has(query)) return wikiSearchCache.get(query);
+    const task = (async () => {
+      try {
+        const params = new URLSearchParams({action:'query',list:'search',srsearch:query,srnamespace:'*',srlimit:'1',format:'json',origin:'*'});
+        const resp = await fetch('https://ff14.huijiwiki.com/api.php?' + params,{signal:AbortSignal.timeout(6000),credentials:'omit'});
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const result = await resp.json();
+        if (!Array.isArray(result.query?.search) || result.error) throw new Error('灰機未回傳有效搜尋結果');
+        if (result.query.search.length) return wikiSearchInfo(item);
+        return {url:'https://duckduckgo.com/?q=' + encodeURIComponent('!ducky site:ff14.huijiwiki.com ' + query),
+          pending:false,isLucky:true,label:'✨ 鴨鴨好手氣',tooltip:'灰機站內搜尋零筆，嘗試以鴨鴨搜尋跳轉；結果不保證直達'};
+      } catch { wikiSearchCache.delete(query); return wikiSearchInfo(item,false,true); }
+    })();
+    wikiSearchCache.set(query,task);
+    return task;
+  }
+
+  function applyWikiInfo(links,info) {
+    for (const link of links) {
+      link.title = info.tooltip;
+      link.setAttribute('rel','noopener noreferrer');
+      link.setAttribute('aria-disabled',String(Boolean(info.pending)));
+      if (info.pending) {
+        link.removeAttribute('href');
+        link.style.opacity = '0.65';
+        link.style.cursor = 'wait';
+      } else {
+        link.href = info.url;
+        link.style.opacity = '';
+        link.style.cursor = '';
+      }
+      if (link.classList.contains('wiki-btn')) {
+        link.textContent = info.label;
+        link.classList.toggle('lucky',Boolean(info.isLucky));
+      }
+    }
+  }
+
+
+  function getGoogleHuijiUrl(item) {
+    const rawZh = (item.name_zh || "").trim();
+    const rawEnJp = (item.name_en_jp || "").trim();
+
+    let cleanEn = "";
+    let cleanJa = "";
+    if (rawEnJp && rawEnJp !== "無" && rawEnJp !== "None") {
+      const parts = rawEnJp.split("/").map(s => s.trim()).filter(Boolean);
+      for (let p of parts) {
+        if (!cleanEn && /[a-zA-Z]/.test(p)) cleanEn = p;
+        if (!cleanJa && /[\u3040-\u30ff]/.test(p)) cleanJa = p;
+      }
+    }
+
+    // 順序優先級：英文 ➔ 日文 ➔ 原文
+    let queryTerm = cleanEn ? `"${cleanEn}"` : (cleanJa ? `"${cleanJa}"` : rawZh);
+    return `https://www.google.com/search?q=${encodeURIComponent('site:ff14.huijiwiki.com ' + queryTerm)}`;
+  }
+  // 取得方式只使用外部來源庫，未收錄時請查灰機。
+  function resolveEquipmentSource(item) {
+    const db = getCustomDatabase();
+    const match = matchEquipment(item);
+    const sources = match?.id && db?.sources?.[match.id];
+    if (sources?.length) {
+      const lines = [...new Set(sources.map(s => s.text))];
+      return { sourceText: lines.join('；'), lines, id:match.id, matchType:match.matchType, isVerified: true };
+    }
+    if (match && !match.id) return {sourceText:'請安裝完整取得方式資料庫',reason:'old_database',isVerified:false};
+    return { sourceText: match?.id ? '來源庫未收錄取得方式，請查灰機wiki' : '名稱未精確匹配，請查灰機wiki',
+      reason:match?.id ? 'missing_source' : 'unmatched',isVerified:false };
+  }
+  // === [SECTION: JS_EQUIPMENT_RESOLVER] END ===
+
+  // === [SECTION: JS_OFFICIAL_DYE_TRANSLATOR] START ===
+  const COMPACT_OFFICIAL_DYES = [["松節油","Terebinth","テレビン油"],["素雪白染劑","Snow White","スノウホワイト"],["蒼白灰染劑","Ash Grey","アッシュグレイ"],["古菩灰染劑","Goobbue Grey","グゥーブーグレイ"],["石板灰染劑","Slate Grey","スレートグレイ"],["木炭灰染劑","Charcoal Grey","チャコールグレイ"],["煤煙黑染劑","Soot Black","スートブラック"],["玫瑰粉染劑","Rose Pink","ローズピンク"],["丁香紫染劑","Lilac Purple","ライラックパープル"],["羅蘭莓染劑","Rolanberry Red","ロランベリーレッド"],["衛月紅染劑","Dalamud Red","ダラガブレッド"],["鐵銹紅染劑","Rust Red","ラストレッド"],["果酒紅染劑","Wine Red","ワインレッド"],["珊瑚粉染劑","Coral Pink","コーラルピンク"],["鮮血紅染劑","Blood Red","ブラッドレッド"],["鮭魚粉染劑","Salmon Pink","サーモンピンク"],["日落橙染劑","Sunset Orange","サンセットオレンジ"],["台地紅染劑","Mesa Red","メサレッド"],["樹皮棕染劑","Bark Brown","バークブラウン"],["巧克力染劑","Chocolate Brown","チョコレートブラウン"],["鐵銹棕染劑","Russet Brown","ラセットブラウン"],["鈷鐵棕染劑","Kobold Brown","コボルドブラウン"],["軟木棕染劑","Cork Brown","コルクブラウン"],["盧恩棕染劑","Qiqirn Brown","キキルンブラウン"],["奧猴棕染劑","Opo-opo Brown","オポオポブラウン"],["山羊棕染劑","Aldgoat Brown","アルドゴートブラウン"],["南瓜橙染劑","Pumpkin Orange","パンプキンオレンジ"],["橡果棕染劑","Acorn Brown","エーコンブラウン"],["果園棕染劑","Orchard Brown","オーチャードブラウン"],["山栗棕染劑","Chestnut Brown","チェスナットブラウン"],["哥布林染劑","Gobbiebag Brown","ゴブリンブラウン"],["頁岩棕染劑","Shale Brown","シェールブラウン"],["鼴鼠棕染劑","Mole Brown","モールブラウン"],["沃土棕染劑","Loam Brown","ロームブラウン"],["骸骨白染劑","Bone White","ボーンホワイト"],["黃沙棕染劑","Ul Brown","ウルダハンブラウン"],["沙漠黃染劑","Desert Yellow","デザートイエロー"],["蜂蜜黃染劑","Honey Yellow","ハニーイエロー"],["玉米黃染劑","Millioncorn Yellow","ミリオンコーンイエロー"],["猛豹黃染劑","Coeurl Yellow","クァールイエロー"],["奶油黃染劑","Cream Yellow","クリームイエロー"],["日影黃染劑","Halatali Yellow","ハラタリイエロー"],["葡萄乾棕染劑","Raisin Brown","レーズンブラウン"],["泥沼綠染劑","Mud Green","マッドグリーン"],["妖精綠染劑","Sylph Green","シルフグリーン"],["青檸綠染劑","Lime Green","ライムグリーン"],["苔蘚綠染劑","Moss Green","モスグリーン"],["牧草綠染劑","Meadow Green","メドウグリーン"],["橄欖綠染劑","Olive Green","オリーヴグリーン"],["沼澤綠染劑","Marsh Green","マーシュグリーン"],["蘋果綠染劑","Apple Green","アップルグリーン"],["仙人掌染劑","Cactuar Green","サボテンダーグリーン"],["獵人綠染劑","Hunter Green","ハンターグリーン"],["口花綠染劑","Ochu Green","オチューグリーン"],["金龜綠染劑","Adamantoise Green","アダマンタスグリーン"],["地神綠染劑","Nophica Green","ノフィカグリーン"],["深林綠染劑","Deepwood Green","ディープウッドグリーン"],["天上藍染劑","Celeste Green","セレストグリーン"],["綠松藍染劑","Turquoise Green","ターコイズグリーン"],["魔花綠染劑","Morbol Green","モルボルグリーン"],["寒冰藍染劑","Ice Blue","アイスブルー"],["天空藍染劑","Sky Blue","スカイブルー"],["海霧藍染劑","Seafog Blue","シーフォグブルー"],["孔雀藍染劑","Peacock Blue","ピーコックブルー"],["羅海藍染劑","Rhotano Blue","ロータノブルー"],["腐屍藍染劑","Corpse Blue","コープスブルー"],["青磷藍染劑","Ceruleum Blue","セルレアムブルー"],["靛青藍染劑","Woad Blue","ウォードブルー"],["油墨藍染劑","Ink Blue","インクブルー"],["盜龍藍染劑","Raptor Blue","ラプトルブルー"],["東洲藍染劑","Othard Blue","オサードブルー"],["風暴藍染劑","Storm Blue","ストームブルー"],["虛空藍染劑","Void Blue","ヴォイドブルー"],["皇室藍染劑","Royal Blue","ロイヤルブルー"],["午夜藍染劑","Midnight Blue","ミッドナイトブルー"],["陰影藍染劑","Shadow Blue","シャドウブルー"],["深淵藍染劑","Abyssal Blue","アビサルブルー"],["薰衣草染劑","Lavender Purple","ラベンダーブルー"],["憂鬱紫染劑","Gloom Purple","グルームパープル"],["醋栗紫染劑","Currant Purple","カラントパープル"],["鳶尾紫染劑","Iris Purple","アイリスパープル"],["葡萄紫染劑","Grape Purple","グレープパープル"],["蓮花粉染劑","Lotus Pink","ロータスピンク"],["蜂鳥粉染劑","Colibri Pink","コリブリピンク"],["仙子梅染劑","Plum Purple","プラムパープル"],["帝王紫染劑","Regal Purple","リーガルパープル"],["生漆","Raw Urushi","生漆"],["黑漆","Black Urushi","黒漆"],["特製無瑕白染劑","Pure White","ピュアホワイトEX"],["特製煤玉黑染劑","Jet Black","ジェットブラックEX"],["特製柔彩粉染劑","Pastel Pink","パステルピンクEX"],["特製黑暗紅染劑","Dark Red","ダークレッドEX"],["特製黑暗棕染劑","Dark Brown","ダークブラウンEX"],["特製柔彩綠染劑","Pastel Green","パステルグリーンEX"],["特製黑暗綠染劑","Dark Green","ダークグリーンEX"],["特製柔彩藍染劑","Pastel Blue","パステルブルーEX"],["特製黑暗藍染劑","Dark Blue","ダークブルーEX"],["特製柔彩紫染劑","Pastel Purple","パステルパープルEX"],["特製黑暗紫染劑","Dark Purple","ダークパープルEX"],["特製閃耀銀染劑","Metallic Silver","シャインシルバーEX"],["特製閃耀金染劑","Metallic Gold","シャインゴールドEX"],["特製金屬紅染劑","Metallic Red","メタリックレッドEX"],["特製金屬橙染劑","Metallic Orange","メタリックオレンジEX"],["特製金屬黃染劑","Metallic Yellow","メタリックイエローEX"],["特製金屬綠染劑","Metallic Green","メタリックグリーンEX"],["特製金屬藍染劑","Metallic Sky Blue","メタリックスカイブルーEX"],["特製金屬靛染劑","Metallic Blue","メタリックブルーEX"],["特製金屬紫染劑","Metallic Purple","メタリックパープルEX"],["無瑕白染劑","Pure White","ピュアホワイト"],["煤玉黑染劑","Jet Black","ジェットブラック"],["閃耀銀染劑","Metallic Silver","シャインシルバー"],["閃耀金染劑","Metallic Gold","シャインゴールド"],["柔彩粉染劑","Pastel Pink","パステルピンク"],["黑暗紅染劑","Dark Red","ダークレッド"],["黑暗棕染劑","Dark Brown","ダークブラウン"],["柔彩綠染劑","Pastel Green","パステルグリーン"],["黑暗綠染劑","Dark Green","ダークグリーン"],["柔彩藍染劑","Pastel Blue","パステルブルー"],["黑暗藍染劑","Dark Blue","ダークブルー"],["柔彩紫染劑","Pastel Purple","パステルパープル"],["黑暗紫染劑","Dark Purple","ダークパープル"],["金屬紅染劑","Metallic Red","メタリックレッド"],["金屬橙染劑","Metallic Orange","メタリックオレンジ"],["金屬黃染劑","Metallic Yellow","メタリックイエロー"],["金屬綠染劑","Metallic Green","メタリックグリーン"],["金屬藍染劑","Metallic Sky Blue","メタリックスカイブルー"],["金屬靛染劑","Metallic Blue","メタリックブルー"],["金屬紫染劑","Metallic Purple","メタリックパープル"],["寶石紅染劑","Ruby Red","ルビーレッド"],["櫻桃粉染劑","Cherry Pink","チェリーピンク"],["絲雀黃染劑","Canary Yellow","カナリーイエロー"],["香草黃染劑","Vanilla Yellow","バニライエロー"],["龍騎藍染劑","Dragoon Blue","ドラグーンブルー"],["松石藍染劑","Turquoise Blue","ターコイズブルー"],["砲銅黑染劑","Gunmetal Black","ガンメタル"],["珍珠白染劑","Pearl White","パールホワイト"],["金屬銅染劑","Metallic Brass","シャインブラス"],["霓虹粉染劑","Neon Pink","ネオンピンク"],["明亮橙染劑","Bright Orange","ブライトオレンジ"],["霓虹綠染劑","Neon Green","ネオングリーン"],["霓虹黃染劑","Neon Yellow","ネオンイエロー"],["羅蘭紫染劑","Violet Purple","バイオレットパープル"],["碧空藍染劑","Azure Blue","アズールブルー"],["金屬粉染劑","Metallic Pink","メタリックピンク"],["金屬寶石紅染劑","Metallic Ruby Red","メタリックルビーレッド"],["金屬鈷鐵綠染劑","Metallic Cobalt Green","メタリックコバルトグリーン"],["金屬黑暗藍染劑","Metallic Dark Blue","メタリックダークブルー"],["胭脂紅染劑","Carmine Red","カーマインレッド"],["通用染劑","Standard Spectrum","ノーマルカラー"],["追加染劑1","Wide Spectrum #1","アディショナルカラー1"],["追加染劑2","Wide Spectrum #2","アディショナルカラー2"]];
+
+  const DYE_LOOKUP_MAP = new Map();
+
+
+  function initOfficialDyeLookup() {
+    COMPACT_OFFICIAL_DYES.forEach(([zh, en, ja]) => {
+      const zhShort = zh.replace('染劑', '').replace('特製', '');
+      const zhTargets = [
+        zh, zhShort,
+        zh.toLowerCase(), zhShort.toLowerCase(),
+        zh.replace('砲', '炮'), zhShort.replace('砲', '炮'),
+        zh.replace('炮', '砲'), zhShort.replace('炮', '砲')
+      ];
+      zhTargets.forEach(k => { if (k) DYE_LOOKUP_MAP.set(k, zh); });
+
+      if (en) {
+        const enLower = en.toLowerCase().trim();
+        DYE_LOOKUP_MAP.set(enLower, zh);
+        DYE_LOOKUP_MAP.set(enLower + ' dye', zh);
+        const enClean = enLower.replace(/^general-purpose\s+/, '').replace(/^special\s+/, '');
+        DYE_LOOKUP_MAP.set(enClean, zh);
+        DYE_LOOKUP_MAP.set(enClean + ' dye', zh);
+      }
+
+      if (ja) {
+        const jaClean = ja.replace(/^カララント:/, '').trim();
+        DYE_LOOKUP_MAP.set(jaClean, zh);
+        DYE_LOOKUP_MAP.set(jaClean.replace(/EX$/, ''), zh);
+        if (jaClean.includes('ヴ')) DYE_LOOKUP_MAP.set(jaClean.replace(/ヴ/g, 'ブ'), zh);
+        if (jaClean.includes('ブ')) DYE_LOOKUP_MAP.set(jaClean.replace(/ブ/g, 'ヴ'), zh);
+      }
+    });
+
+    const emptyVals = ['未染色', '無染色', 'なし', 'none', '-', '/', '未染', '無', 'nil', 'null'];
+    emptyVals.forEach(k => DYE_LOOKUP_MAP.set(k, '未染色'));
+  }
+  initOfficialDyeLookup();
+
+  function lookupSingleOfficialDye(str) {
+    if (!str) return null;
+    const s = str.trim();
+    if (DYE_LOOKUP_MAP.has(s)) return DYE_LOOKUP_MAP.get(s);
+    if (DYE_LOOKUP_MAP.has(s.toLowerCase())) return DYE_LOOKUP_MAP.get(s.toLowerCase());
+    return null;
+  }
+
+  function translateSingleDyePart(part) {
+    part = (part || '').trim();
+    if (!part) return '';
+
+    let prefix = '';
+    const prefixMatch = part.match(/^([①②③④⑤\d]+[:\.\s\-]*)(.*)$/);
+    if (prefixMatch && ['①', '②', '1', '2', '1:', '2:', '1.', '2.', '#1', '#2'].includes(prefixMatch[1].trim())) {
+      prefix = prefixMatch[1];
+      part = prefixMatch[2].trim();
+    }
+
+    // 括號拆解：例如 "シェールブラウン (Shale Brown)" 或 "Shale Brown (シェールブラウン)"
+    const parenMatch = part.match(/^(.*?)\s*[\(\uff08]([^\)\uff09]+)[\)\uff09]$/);
+    if (parenMatch) {
+      const mainPart = parenMatch[1].trim();
+      const subPart = parenMatch[2].trim();
+      const mainTrans = lookupSingleOfficialDye(mainPart);
+      const subTrans = lookupSingleOfficialDye(subPart);
+      const zh = mainTrans || subTrans;
+      if (zh) {
+        if (zh === '未染色') return `${prefix}未染色`;
+        const orig = (zh !== subPart) ? subPart : mainPart;
+        return (orig && orig !== zh) ? `${prefix}${zh} (${orig})` : `${prefix}${zh}`;
+      }
+    }
+
+    const direct = lookupSingleOfficialDye(part);
+    if (direct) {
+      if (direct === '未染色') return `${prefix}未染色`;
+      const isCardNonZh = /[\u3040-\u30ff]/.test(part) || /^[A-Za-z0-9\s\'\._-]+$/.test(part);
+      return isCardNonZh ? `${prefix}${direct} (${part})` : `${prefix}${direct}`;
+    }
+
+    return `${prefix}${part}`;
+  }
+
+  // 染色設定智慧中文化轉換器（支援 7.0 雙染色通道 ① / ② 與多種分隔符號）
+  function translateDyeSetting(raw) {
+    if (!raw || !String(raw).trim()) return '未染色';
+    const s = String(raw).trim();
+    if (['none', 'なし', '-', '无', '無', '未染色', '無染色', 'nil', 'null'].includes(s.toLowerCase())) {
+      return '未染色';
+    }
+    const parts = s.split(/[/、&\n]+/);
+    const translated = parts.map(translateSingleDyePart).filter(Boolean);
+    return translated.length > 0 ? translated.join(' / ') : '未染色';
+  }
+  // === [SECTION: JS_OFFICIAL_DYE_TRANSLATOR] END ===
+
+
+  // ==============================================================================
+  // === [SECTION: JS_UI_RENDER_EXPORT] START ===
+  // ==============================================================================
+  // 4. 渲染結果到畫面上 (繁中歸繁中、英日雙軌呈現)
+  function renderResult(data) {
+    if (!data || !Array.isArray(data.items)) throw new Error('AI 回傳缺少裝備陣列');
+    data.items = data.items.map(item => {
+      if (!item || typeof item !== 'object') throw new Error('AI 裝備資料格式錯誤');
+      return Object.fromEntries(['slot','name_zh','name_huiji','name_en_jp','source','dye','dye_setting'].map(k => [k, typeof item[k] === 'string' ? item[k] : '']));
+    });
+    document.getElementById("outfitTitle").innerText = data.outfit_title || "【套裝】外觀穿搭";
+    
+    const tbody = document.getElementById("itemsTableBody");
+    tbody.innerHTML = "";
+
+    const generation = ++wikiRenderGeneration;
+    data.items.forEach(item => {
+      delete item._wikiInfo;
+      const wikiInfo = getHuijiWikiUrl(item);
+      const googleUrl = getGoogleHuijiUrl(item);
+
+      // 裝備主名稱解析：若卡片原名是日文或純英文，且大庫已成功匹配出中文名稱，優先顯示中文！
+      let displayGearName = item.name_zh || "";
+      const matchedRecord = matchEquipment(item);
+      if (matchedRecord?.names.tc) displayGearName = matchedRecord.names.tc;
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(item.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(item.name_zh || "");
+      if (!matchedRecord?.names.tc && item.resolved_name && isCardNonChinese) {
+        displayGearName = item.resolved_name;
+      }
+
+      // 次標題：若主標題顯示中文，次標題顯示英文/日文原名
+      const hasEnJp = item.name_en_jp && item.name_en_jp !== "無" && item.name_en_jp !== "None" && item.name_en_jp.trim() !== "";
+      let subNameText = "";
+      if (hasEnJp) {
+        subNameText = item.name_en_jp;
+      } else if (item.resolved_name && item.resolved_name !== item.name_zh) {
+        subNameText = item.name_zh;
+      }
+      const subNameHtml = subNameText ? `<div class="sub-name">${escapeHtml(subNameText)}</div>` : "";
+
+      // 取得途徑解析（方案一優先：精準特徵庫 ➔ 方案二：AI記憶 + 標註「AI判讀，詳細請點進灰機」）
+      const sourceInfo = resolveEquipmentSource(item);
+      let sourceHtml = "";
+      if (sourceInfo.isVerified) {
+        sourceHtml = sourceInfo.lines.map(line => `<div class="source-verified" title="${sourceInfo.matchType === 'fuzzy' ? '疑似物品' : '物品'} ID ${sourceInfo.id} 的來源記錄，請以實際伺服器為準">📚 ${escapeHtml(line)}</div>`).join('');
+      } else {
+        const status = sourceInfo.reason === 'unmatched' ? '未精確匹配' : sourceInfo.reason === 'old_database' ? '需安裝完整來源庫' : '來源未收錄';
+        sourceHtml = `<span>${escapeHtml(sourceInfo.sourceText)}</span> <span class="source-ai-badge">（${status}）</span>`;
+      }
+
+      const btnClass = wikiInfo.isLucky ? "wiki-btn lucky" : "wiki-btn";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><span class="slot-badge">${escapeHtml(item.slot)}</span></td>
+        <td>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
+            <a href="${wikiInfo.url}" target="_blank" class="gear-link" title="${escapeHtml(wikiInfo.tooltip)}">
+              ${escapeHtml(displayGearName)}
+            </a>
+            <div style="display:flex; gap:4px;">
+              <a href="${wikiInfo.url}" target="_blank" class="${btnClass}" title="${escapeHtml(wikiInfo.tooltip)}">${wikiInfo.label}</a>
+              <a href="${googleUrl}" target="_blank" class="wiki-btn google" title="在 Google 瀏覽此裝備的所有灰機搜尋結果">🔍 Google</a>
+            </div>
+          </div>
+          ${subNameHtml}
+          ${matchedRecord?.matchType === 'fuzzy' ? `<div class="source-ai-badge" title="簡繁字形與加權錯字輔助；長名稱最多兩字差異，取得方式來自候選物品 ID，請確認名稱">⚠ 疑似匹配：${escapeHtml(matchedRecord.original)} → ${escapeHtml(matchedRecord.names.tc || matchedRecord.names.chs || matchedRecord.matchedName)}</div>` : ""}
+        </td>
+        <td>${sourceHtml}</td>
+        <td><span class="dye-tag">${escapeHtml(translateDyeSetting(item.dye || item.dye_setting || ""))}</span></td>
+      `;
+      tbody.appendChild(tr);
+      const links = tr.querySelectorAll('.gear-link, .wiki-btn:not(.google)');
+      applyWikiInfo(links, wikiInfo);
+      if (wikiInfo.pending) {
+        precheckWiki(item).then(info => {
+          if (generation !== wikiRenderGeneration || !tr.isConnected) return;
+          item._wikiInfo = info;
+          applyWikiInfo(links, info);
+        });
+      }
+    });
+
+    const noteBox = document.getElementById("noteBox");
+    if (data.note) {
+      noteBox.innerHTML = `<b>💡 穿搭提醒：</b> ${escapeHtml(data.note)}`;
+      noteBox.style.display = "block";
+    } else {
+      noteBox.style.display = "none";
+    }
+
+    document.getElementById("resultSection").style.display = "block";
+    document.getElementById("resultSection").scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // 5. 匯出功能（一鍵複製到 Excel、下載 CSV、下載 TXT）
+  function copyToClipboard() {
+    if (!currentOutfitData) return;
+    
+    let lines = [];
+    lines.push(["部位", "繁中裝備名稱", "外語原名（英／日／法／德）", "取得方式", "染色設定", "灰機wiki網址"].join("\t"));
+    (currentOutfitData.items || []).forEach(it => {
+      const wikiInfo = getHuijiWikiUrl(it);
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
+      const gearName = matchedEquipmentExportName(it, (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh));
+      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
+      const sourceInfo = resolveEquipmentSource(it);
+      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
+      lines.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].join("\t"));
+    });
+    if (currentOutfitData.note) {
+      lines.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].join("\t"));
+    }
+
+    const textToCopy = lines.join("\n");
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      showToast("📋 已複製表格（含灰機直連網址）！在 Excel 按 Ctrl+V 即可貼上！");
+    }).catch(err => {
+      alert("複製失敗，請手動反白選取。");
+    });
+  }
+
+  function downloadCSV() {
+    if (!currentOutfitData) return;
+    
+    let csvRows = [];
+    csvRows.push(["部位", "繁中裝備名稱", "外語原名（英／日／法／德）", "取得方式", "染色設定", "灰機wiki網址"].map(escapeCsv).join(","));
+    
+    (currentOutfitData.items || []).forEach(it => {
+      const wikiInfo = getHuijiWikiUrl(it);
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
+      const gearName = matchedEquipmentExportName(it, (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh));
+      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
+      const sourceInfo = resolveEquipmentSource(it);
+      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
+      csvRows.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].map(escapeCsv).join(","));
+    });
+    
+    if (currentOutfitData.note) {
+      csvRows.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].map(escapeCsv).join(","));
+    }
+
+    // 加入 UTF-8 BOM (\uFEFF)，保證 Windows Excel 打開絕對不亂碼！
+    const csvString = "\uFEFF" + csvRows.join("\r\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const filename = `${sanitizeFilename(currentOutfitData.outfit_title || "FF14外觀")}.csv`;
+    downloadBlob(blob, filename);
+  }
+
+  function downloadTXT() {
+    if (!currentOutfitData) return;
+    
+    let lines = [];
+    lines.push(`【${currentOutfitData.outfit_title || "FF14 外觀穿搭"}】`);
+    lines.push("=".repeat(50));
+    (currentOutfitData.items || []).forEach(it => {
+      const wikiInfo = getHuijiWikiUrl(it);
+      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
+      const gearName = matchedEquipmentExportName(it, (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh));
+      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
+      const sourceInfo = resolveEquipmentSource(it);
+      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
+      lines.push(`• [${it.slot}] ${gearName}`);
+      if (subName) lines.push(`  原名：${subName}`);
+      lines.push(`  來源：${finalSource}`);
+      lines.push(`  染色：${translateDyeSetting(it.dye || it.dye_setting || "")}`);
+      lines.push(`  灰機：${wikiInfo.url}`);
+      lines.push("");
+    });
+    if (currentOutfitData.note) {
+      lines.push("-".repeat(50));
+      lines.push(`💡 穿搭提醒：${currentOutfitData.note}`);
+    }
+
+    const blob = new Blob([lines.join("\r\n")], { type: "text/plain;charset=utf-8;" });
+    const filename = `${sanitizeFilename(currentOutfitData.outfit_title || "FF14外觀")}.txt`;
+    downloadBlob(blob, filename);
+  }
+
+  function escapeCsv(val) {
+    if (val == null) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  }
+
+  function sanitizeFilename(name) {
+    return name.replace(/[\\/:*?"<>|]/g, "_").trim();
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById("toast");
+    toast.innerText = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2800);
+  }
+
+  function escapeHtml(text) {
+    if (text == null) return "";
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  // === [SECTION: JS_UI_RENDER_EXPORT] END ===
+</script>
+
+</body>
+<!-- OpenCC TSCharacters subset; source https://github.com/BYVoid/OpenCC/tree/3ac34aa439a9908dd49fa92b5174b46314787ac2
+Apache License
+Version 2.0, January 2004
+http://www.apache.org/licenses/
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. Definitions.
+
+"License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 9 of this document.
+
+"Licensor" shall mean the copyright owner or entity authorized by the copyright owner that is granting the License.
+
+"Legal Entity" shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
+
+"You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+
+"Source" form shall mean the preferred form for making modifications, including but not limited to software source code, documentation source, and configuration files.
+
+"Object" form shall mean any form resulting from mechanical transformation or translation of a Source form, including but not limited to compiled object code, generated documentation, and conversions to other media types.
+
+"Work" shall mean the work of authorship, whether in Source or Object form, made available under the License, as indicated by a copyright notice that is included in or attached to the work (an example is provided in the Appendix below).
+
+"Derivative Works" shall mean any work, whether in Source or Object form, that is based on (or derived from) the Work and for which the editorial revisions, annotations, elaborations, or other modifications represent, as a whole, an original work of authorship. For the purposes of this License, Derivative Works shall not include works that remain separable from, or merely link (or bind by name) to the interfaces of, the Work and Derivative Works thereof.
+
+"Contribution" shall mean any work of authorship, including the original version of the Work and any modifications or additions to that Work or Derivative Works thereof, that is intentionally submitted to Licensor for inclusion in the Work by the copyright owner or by an individual or Legal Entity authorized to submit on behalf of the copyright owner. For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to the Licensor or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, the Licensor for the purpose of discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by the copyright owner as "Not a Contribution."
+
+"Contributor" shall mean Licensor and any individual or Legal Entity on behalf of whom a Contribution has been received by Licensor and subsequently incorporated within the Work.
+
+2. Grant of Copyright License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare Derivative Works of, publicly display, publicly perform, sublicense, and distribute the Work and such Derivative Works in Source or Object form.
+
+3. Grant of Patent License. Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the Work, where such license applies only to those patent claims licensable by such Contributor that are necessarily infringed by their Contribution(s) alone or by combination of their Contribution(s) with the Work to which such Contribution(s) was submitted. If You institute patent litigation against any entity (including a cross-claim or counterclaim in a lawsuit) alleging that the Work or a Contribution incorporated within the Work constitutes direct or contributory patent infringement, then any patent licenses granted to You under this License for that Work shall terminate as of the date such litigation is filed.
+
+4. Redistribution. You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in Source or Object form, provided that You meet the following conditions:
+
+   1. You must give any other recipients of the Work or Derivative Works a copy of this License; and
+
+   2. You must cause any modified files to carry prominent notices stating that You changed the files; and
+
+   3. You must retain, in the Source form of any Derivative Works that You distribute, all copyright, patent, trademark, and attribution notices from the Source form of the Work, excluding those notices that do not pertain to any part of the Derivative Works; and
+
+   4. If the Work includes a "NOTICE" text file as part of its distribution, then any Derivative Works that You distribute must include a readable copy of the attribution notices contained within such NOTICE file, excluding those notices that do not pertain to any part of the Derivative Works, in at least one of the following places: within a NOTICE text file distributed as part of the Derivative Works; within the Source form or documentation, if provided along with the Derivative Works; or, within a display generated by the Derivative Works, if and wherever such third-party notices normally appear. The contents of the NOTICE file are for informational purposes only and do not modify the License. You may add Your own attribution notices within Derivative Works that You distribute, alongside or as an addendum to the NOTICE text from the Work, provided that such additional attribution notices cannot be construed as modifying the License.
+
+You may add Your own copyright statement to Your modifications and may provide additional or different license terms and conditions for use, reproduction, or distribution of Your modifications, or for any such Derivative Works as a whole, provided Your use, reproduction, and distribution of the Work otherwise complies with the conditions stated in this License.
+
+5. Submission of Contributions. Unless You explicitly state otherwise, any Contribution intentionally submitted for inclusion in the Work by You to the Licensor shall be under the terms and conditions of this License, without any additional terms or conditions. Notwithstanding the above, nothing herein shall supersede or modify the terms of any separate license agreement you may have executed with Licensor regarding such Contributions.
+
+6. Trademarks. This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+7. Disclaimer of Warranty. Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+8. Limitation of Liability. In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
+
+9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
+
+END OF TERMS AND CONDITIONS
+
+
+-->
+</html>

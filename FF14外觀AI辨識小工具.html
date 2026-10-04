@@ -34,7 +34,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 v2.3.0</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 v2.4.0</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -789,19 +789,19 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.3.0版</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.4.0版</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
            <span id="dbBtnLabel">裝備庫: 官方同步</span>
         </button>
         <button class="header-btn" onclick="openKeyModal()">
-          🔑 <span id="keyBtnLabel">設定 API Key</span>
+          <span id="keyBtnLabel">辨識模型：PaddleOCR</span>
         </button>
       </div>
     </div>
     <div class="header-subtext">
-      拖入穿搭圖片 ──► AI辨識 ──► 灰機直達 / 站內搜尋 / 鴨鴨好手氣（Google 備援）
+      拖入穿搭圖片 ──► 免費 OCR / AI辨識 ──► 灰機直達 / 站內搜尋 / 鴨鴨好手氣（Google 備援）
     </div>
   </header>
 
@@ -820,7 +820,7 @@
   <div class="upload-card" id="dropZone" onclick="triggerFileInput()">
     <div class="upload-icon">📸</div>
     <div class="upload-title">點擊或拖放外觀截圖至此處（支援剪貼簿 Ctrl+V 貼上）</div>
-    <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF（建議使用帶有日文/英文裝備名稱標籤的 EC 截圖）</div>
+    <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF<br>目前僅支援繁中、簡中、英文、日文、法文、德文</div>
     <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
   </div>
 
@@ -828,7 +828,7 @@
   <div class="loading-overlay" id="loadingBox">
     <div class="spinner"></div>
     <div class="loading-text" id="loadingMsg">AI 正在讀取圖片文字並索引官方裝備庫...</div>
-    <div class="loading-sub">⏳ 尖峰時段多伺服器自動協調約需 20~40 秒，請稍候</div>
+    <div class="loading-sub">⏳ 免費 OCR 首次需下載模型；後續圖片使用已載入的引擎。</div>
 
     <!-- Live Status Console -->
     <div class="status-console" id="statusConsole">
@@ -918,31 +918,29 @@
 <div class="modal-overlay" id="keyModal">
   <div class="modal-card">
     <div class="modal-header">
-      <h3>⚙️ AI 服務商與 API Key 設定</h3>
+      <h3>辨識設定</h3>
     </div>
     <div class="modal-body">
-      <p style="margin-bottom: 12px; color: #576574; font-size: 0.88rem; line-height: 1.5;">
-        🔒 <b>隱私承諾：</b>本工具為 100% 純前端開源架構，無任何後端伺服器。您的金鑰<b>僅保存在您本機瀏覽器內 (localStorage)</b>，識別請求由瀏覽器直連官方 API，絕不上傳或紀錄任何資料，歡迎隨時按 F12 檢驗網路封包與程式碼。<br>
-        💡 可下載此 HTML 在本機開啟，並匯入 JSON 資料庫。名稱查詢可離線使用；AI 辨識、灰機預查與同步仍需要網路。
-      </p>
-      
+      <p style="margin-bottom:12px;color:#576574;font-size:0.88rem;line-height:1.5">預設使用 PaddleOCR 在本機瀏覽器處理圖片；如改用 AI 時，圖片會傳送至所選服務商。API Key 僅儲存在本機瀏覽器。</p>
+
       <div class="input-group">
-        <label for="providerSelect">選擇 AI 服務商：</label>
+        <label for="providerSelect">辨識模型：</label>
         <select id="providerSelect" onchange="onProviderChange()">
-          <option value="gemini">🌟 Google Gemini（推薦首選，每天 1,000 次免費）</option>
-          <option value="openai">⚡ OpenAI 官方（GPT-4o-mini，極度穩定，需付費帳號）</option>
-          <option value="custom">🌐 萬用自訂 / OpenRouter / OpenAI 相容接口（支援 Claude 3.5、Qwen 等）</option>
+          <option value="paddleocr">PaddleOCR（免費，預設）</option><option value="gemini">Gemini</option>
+          <option value="openai">ChatGPT（OpenAI API）</option>
+          <option value="custom">其他（自訂／OpenRouter）</option>
         </select>
       </div>
 
-      <!-- Gemini Config Panel -->
+      <div id="paddleConfigBox" class="step-box">使用 PaddleOCR.js＋PP-OCRv5 輕量模型，在瀏覽器內辨識圖片文字，不需 API Key；首次使用需下載模型。適合有裝備名稱文字的截圖。</div>
+<!-- Gemini Config Panel -->
       <div id="geminiConfigBox" style="margin-top: 14px;">
         <div class="step-box">
-          <b>💡 Google Gemini 免費取得步驟（每天 1,000 次額度）：</b>
+          <b>💡 Google Gemini API Key 取得步驟：</b>
           <ol>
             <li>前往 <a href="https://aistudio.google.com/" target="_blank" style="color:var(--accent); font-weight:bold;">Google AI Studio 官網 (點此開新視窗)</a>。</li>
             <li>登入 Google 帳號，點擊 <b>「Get API key」</b> 後再點擊 <b>「Create API key」</b>。</li>
-            <li>預設自動啟用 <code>gemini-3.5-flash-lite</code> 與 <code>gemini-3.1-flash-lite</code> 雙重高速輪詢。</li>
+            <li>預設自動啟用 <code>gemini-3.5-flash-lite</code> 與 <code>gemini-3.1-flash-lite</code> 雙重輪詢。</li>
           </ol>
         </div>
         <div class="input-group">
@@ -956,7 +954,7 @@
         <div class="step-box">
           <b>💡 OpenAI 設定說明：</b>
           <p style="margin:4px 0 0; font-size:0.85rem; color:#555;">
-            需使用已開通付費儲值的 OpenAI 帳號。預設呼叫 <code>gpt-4o-mini</code> 視覺模型，辨識一張約 0.001 美元（約 0.03 台幣），伺服器永不塞車。
+            預設呼叫 <code>gpt-4o-mini</code> 視覺模型。請至 <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI API Keys</a> 建立金鑰。
           </p>
         </div>
         <div class="input-group">
@@ -990,7 +988,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeKeyModal()">取消</button>
-      <button class="btn btn-primary" onclick="saveApiKey()">確認儲存</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">儲存設定</button>
     </div>
   </div>
 </div>
@@ -1006,12 +1004,12 @@
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.3.0 版本設定
+  // 全域狀態與 v2.4.0 版本設定
   const BUILTIN_VERSION = {
-    version: "v2.3.0",
-    sha: "builtin-v2.3.0",
+    version: "v2.4.0",
+    sha: "builtin-v2.4.0",
     date: "2026-10-04",
-    label: "v2.3.0版"
+    label: "v2.4.0版"
   };
 
   // 1. 初始化
@@ -1029,9 +1027,7 @@
     await loadPrebuiltDatabaseIfEmpty();
     initDatabaseState();
 
-    if (!getApiKey()) {
-      openKeyModal();
-    }
+
   });
 
   // === [SECTION: JS_GLOBAL_STATE] END ===
@@ -1041,7 +1037,7 @@
   // ==============================================================================
   // 多品牌 AI 服務商與 API Key 管理
   function getActiveProvider() {
-    return localStorage.getItem("ff14_ai_provider") || "gemini";
+    return localStorage.getItem("ff14_recognition_provider_231") || "paddleocr";
   }
 
   function getApiKey() {
@@ -1057,6 +1053,7 @@
 
   function onProviderChange() {
     const sel = document.getElementById("providerSelect").value;
+    document.getElementById("paddleConfigBox").style.display = sel === "paddleocr" ? "block" : "none";
     document.getElementById("geminiConfigBox").style.display = (sel === "gemini") ? "block" : "none";
     document.getElementById("openaiConfigBox").style.display = (sel === "openai") ? "block" : "none";
     document.getElementById("customConfigBox").style.display = (sel === "custom") ? "block" : "none";
@@ -1064,18 +1061,9 @@
 
   function updateKeyButtonState() {
     const provider = getActiveProvider();
-    const key = getApiKey();
-    const btnLabel = document.getElementById("keyBtnLabel");
-    
-    let pName = "Google Gemini";
-    if (provider === "openai") pName = "OpenAI";
-    else if (provider === "custom") pName = "自訂 / OpenRouter";
-
-    if (key) {
-      btnLabel.innerText = ` ${pName} (已設定)`;
-    } else {
-      btnLabel.innerText = ` 設定 AI Key (${pName})`;
-    }
+    const names = {paddleocr:'PaddleOCR',gemini:'Gemini',openai:'ChatGPT'};
+    const name = names[provider] || localStorage.getItem('ff14_custom_model')?.trim() || '其他';
+    document.getElementById('keyBtnLabel').textContent = '辨識模型：' + name;
   }
 
   function openKeyModal() {
@@ -1096,7 +1084,7 @@
 
   function saveApiKey() {
     const provider = document.getElementById("providerSelect").value;
-    localStorage.setItem("ff14_ai_provider", provider);
+
 
     if (provider === "gemini") {
       const gKey = document.getElementById("apiKeyInput").value.trim();
@@ -1118,9 +1106,10 @@
       localStorage.setItem("ff14_custom_model", cModel);
     }
 
+    localStorage.setItem("ff14_recognition_provider_231", provider);
     updateKeyButtonState();
     closeKeyModal();
-    showToast("✅ AI 服務商與金鑰設定儲存成功！");
+    showToast("✅ 辨識設定已儲存");
   }
 
   // === [SECTION: JS_PROVIDER_CONFIG] END ===
@@ -1784,7 +1773,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.3.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.4.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -1868,7 +1857,7 @@
   async function processFile(file) {
     if (imageRequestBusy) { showToast('正在辨識，請完成後再加入下一張圖片'); return; }
     if (file.type && !file.type.startsWith('image/')) { showToast('請選擇圖片檔案'); return; }
-    if (!getApiKey()) { openKeyModal(); return; }
+    if (getActiveProvider() !== 'paddleocr' && !getApiKey()) { openKeyModal(); return; }
     imageRequestBusy = true;
     try {
       const mime = file.type || 'image/jpeg';
@@ -1881,13 +1870,97 @@
       document.getElementById('previewImg').src = dataUrl;
       currentImageBase64 = dataUrl.split(',')[1];
       currentImageMime = mime;
-      await callVisionAI(currentImageBase64,mime);
+      if (getActiveProvider() === 'paddleocr') await callLocalOCR(file);
+      else await callVisionAI(currentImageBase64,mime);
     } catch (err) { alert('圖片處理失敗：' + err.message); }
     finally { imageRequestBusy = false; }
   }
   // === [SECTION: JS_UPLOAD_HANDLERS] END ===
 
-  // === [SECTION: JS_AI_DISPATCHER] START ===
+  // === [SECTION: JS_LOCAL_OCR] START ===
+  let paddleEngineLoading;
+  function loadPaddleEngine() {
+    if(window.FF14OCR)return Promise.resolve();
+    if(paddleEngineLoading)return paddleEngineLoading;
+    window.__FF14_OCR_ASSET_BASE__=location.protocol==='file:'?'https://dx90c.github.io/ff14-glamour-ai/ocr/':new URL('./ocr/',location.href).href;
+    paddleEngineLoading=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');script.src=new URL('ocr.js',window.__FF14_OCR_ASSET_BASE__).href;
+      script.onload=()=>window.FF14OCR?resolve():reject(new Error('OCR 引擎未初始化'));
+      script.onerror=()=>{script.remove();paddleEngineLoading=null;reject(new Error('OCR 引擎下載失敗，請確認網路後重試'));};
+      document.head.append(script);
+    });return paddleEngineLoading;
+  }
+async function callLocalOCR(file) {
+  const loading=document.getElementById('loadingBox');
+  loading.style.display='block';document.getElementById('resultSection').style.display='none';
+  document.getElementById('statusLogList').innerHTML='';
+  try {
+
+    if(!getCustomDatabase()?.records)throw new Error('請先在裝備庫匯入或同步完整 JSON，再進行 OCR 辨識');
+    document.getElementById('loadingMsg').textContent='載入免費 OCR 模型與辨識圖片…';
+    appendStatusLog('免費 OCR','圖片在本機瀏覽器辨識；首次需下載模型','info');
+    await loadPaddleEngine();
+    const {recognize}=window.FF14OCR;
+    const db=getCustomDatabase();
+    if(!db.ocrSupport?.slots && location.protocol!=='file:') {
+      const response=await fetch(new URL('./ff14_database.json',location.href));
+      if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
+    }
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.0 裝備庫以取得部位與限制索引');
+    const slots=db.ocrSupport.slots;
+    const restrictions={items:db.ocrSupport.restrictions};
+    const result=await recognize(file);
+    const data=assembleOCRItems(result.items,slots);
+    data.note=equipmentRestrictionNote(data.items,restrictions.items);
+    if(!data.items.length)throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');
+    renderResult(data);currentOutfitData=data;
+    appendStatusLog('完成',`辨識 ${result.items.length} 行，裝備 ${data.items.length} 件；信心分數不等於正確率`,'info');
+  } finally {loading.style.display='none';}
+}
+function equipmentRestrictionNote(items,restrictions) {
+  const matched=items.map(item=>({item,match:matchEquipment(item)})).filter(x=>x.match?.id);
+  const known=matched.filter(x=>restrictions[x.match.id]?.jobs?.length);
+  const notes=[];
+  if(known.length>1){
+    const shared=known.map(x=>restrictions[x.match.id].jobs).reduce((a,b)=>a.filter(job=>b.includes(job)));
+    if(!shared.length)notes.push(`${known.some(x=>x.match.matchType==='fuzzy')?'疑似':''}包含不同職業限定裝備，繁中服請注意投影職業限制${known.length<matched.length?'（部分裝備職業資料未收錄）':''}。`);
+  }
+  const raceNames={'Hyur':'人族','Elezen':'精靈族','Lalafell':'拉拉菲爾族',"Miqo'te":'貓魅族','Roegadyn':'魯加族','Au Ra':'敖龍族','Hrothgar':'硌獅族','Viera':'維艾拉族'};
+  for(const {item,match} of matched){
+    let fit=restrictions[match.id]?.fits;if(!fit)continue;
+    for(const [en,zh] of Object.entries(raceNames))fit=fit.replaceAll(en,zh);
+    fit=fit.replaceAll('♀','女性角色').replaceAll('♂','男性角色');
+    notes.push(`${match.matchType==='fuzzy'?'疑似匹配：':''}${match.names.tc||match.names.chs||item.name_zh}限 ${fit} 使用。`);
+  }
+  return [...new Set(notes)].join(' ');
+}
+function assembleOCRItems(lines,slots) {
+  const slotNames={1:'主手',2:'副手',3:'頭部',4:'身體',5:'手部',6:'腰部',7:'腿部',8:'腳部',9:'耳飾',10:'項鍊',11:'手環',12:'戒指',13:'戒指'};
+  const box=line=>{const xs=line.poly.map(p=>p[0]),ys=line.poly.map(p=>p[1]);return {x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};};
+  const matches=[];
+  for(const line of lines){
+    if(line.score<0.5)continue;
+    const raw=line.text.trim();if(lookupSingleOfficialDye(raw))continue;
+    const match=matchEquipment({name_zh:raw,name_en_jp:''});
+    if(!match?.id || !slotNames[slots[match.id]])continue;
+    const old=matches.find(x=>x.match.id===match.id);
+    const candidate={line,match,b:box(line)};
+    if(!old)matches.push(candidate);
+    else if(match.matchType==='exact' && old.match.matchType!=='exact' || match.matchType===old.match.matchType && line.score>old.line.score)Object.assign(old,candidate);
+  }
+  const items=matches.map(({line,match,b})=>{
+    const dyeLines=lines.filter(other=>{
+      const q=box(other);return other.score>=0.5 && /[\p{L}]/u.test(other.text) && q.y>b.y+b.h/2 && q.y<b.y+Math.max(b.h*7,55) && Math.abs(q.x+q.w/2-b.x-b.w/2)<Math.max(b.w*0.75,45) && lookupSingleOfficialDye(other.text.trim());
+    }).filter(other=>!matches.some(m=>m.match.id!==match.id && m.b.y>b.y && m.b.y<box(other).y && Math.abs(m.b.x-b.x)<Math.max(b.w,45)));
+    const dyes=[...new Set(dyeLines.map(x=>lookupSingleOfficialDye(x.text.trim())))];
+    return {slot:slotNames[slots[match.id]],name_zh:line.text,name_en_jp:'',name_huiji:'',source:'',dye:dyes.length?dyes.join(' / '):'未辨識染色（OCR）'};
+  });
+  items.sort((a,b)=>Object.values(slotNames).indexOf(a.slot)-Object.values(slotNames).indexOf(b.slot));
+  return {outfit_title:'免費 OCR 外觀辨識',note:'',items};
+}
+// === [SECTION: JS_LOCAL_OCR] END ===
+
+// === [SECTION: JS_AI_DISPATCHER] START ===
 
   function getUnifiedSystemPrompt() {
     return `你是一名精通《最終幻想14》（Final Fantasy XIV / FF14）全裝備數據庫與幻化穿搭風格的專家。
@@ -2026,10 +2099,10 @@
   function appendStatusLog(badgeText, msgText, type = "info") {
     const logList = document.getElementById("statusLogList");
     if (!logList) return;
-    
+
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    
+
     const item = document.createElement("div");
     item.className = "log-item";
     item.innerHTML = `
@@ -2038,7 +2111,7 @@
       <span class="log-text">${escapeHtml(msgText)}</span>
     `;
     logList.appendChild(item);
-    
+
     const consoleBox = document.getElementById("statusConsole");
     if (consoleBox) {
       consoleBox.scrollTop = consoleBox.scrollHeight;
@@ -2155,7 +2228,7 @@
             const errData = await response.json().catch(() => ({}));
             const errMsg = errData.error?.message || response.statusText;
             lastError = `${model}: ${response.status} - ${errMsg}`;
-            
+
             if (response.status === 503) {
               appendStatusLog("伺服器繁忙", `⚠️ ${model} 尖峰負載過高 (503)，排隊自動切換...`, "warn");
             } else {
@@ -2514,7 +2587,7 @@
       return Object.fromEntries(['slot','name_zh','name_huiji','name_en_jp','source','dye','dye_setting'].map(k => [k, typeof item[k] === 'string' ? item[k] : '']));
     });
     document.getElementById("outfitTitle").innerText = data.outfit_title || "【套裝】外觀穿搭";
-    
+
     const tbody = document.getElementById("itemsTableBody");
     tbody.innerHTML = "";
 
@@ -2601,7 +2674,7 @@
   // 5. 匯出功能（一鍵複製到 Excel、下載 CSV、下載 TXT）
   function copyToClipboard() {
     if (!currentOutfitData) return;
-    
+
     let lines = [];
     lines.push(["部位", "繁中裝備名稱", "外語原名（英／日／法／德）", "取得方式", "染色設定", "灰機wiki網址"].join("\t"));
     (currentOutfitData.items || []).forEach(it => {
@@ -2627,10 +2700,10 @@
 
   function downloadCSV() {
     if (!currentOutfitData) return;
-    
+
     let csvRows = [];
     csvRows.push(["部位", "繁中裝備名稱", "外語原名（英／日／法／德）", "取得方式", "染色設定", "灰機wiki網址"].map(escapeCsv).join(","));
-    
+
     (currentOutfitData.items || []).forEach(it => {
       const wikiInfo = getHuijiWikiUrl(it);
       const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
@@ -2640,7 +2713,7 @@
       const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
       csvRows.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].map(escapeCsv).join(","));
     });
-    
+
     if (currentOutfitData.note) {
       csvRows.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].map(escapeCsv).join(","));
     }
@@ -2654,7 +2727,7 @@
 
   function downloadTXT() {
     if (!currentOutfitData) return;
-    
+
     let lines = [];
     lines.push(`【${currentOutfitData.outfit_title || "FF14 外觀穿搭"}】`);
     lines.push("=".repeat(50));

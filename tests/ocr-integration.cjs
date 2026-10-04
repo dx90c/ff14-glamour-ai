@@ -1,0 +1,14 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={matchEquipment:item=>item.name_zh==='Baronial Jacket'?{id:'40427',matchType:'exact'}:null,lookupSingleOfficialDye:text=>text==='-'?'未染色':text==='Shale Brown'?'頁岩棕染劑':null};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'ocr-integration-source.js'),'utf8'),ctx);
+const line=(text,y)=>({text,score:.95,poly:[[10,y],[110,y],[110,y+10],[10,y+10]]});
+let result=ctx.assembleOCRItems([line('Baronial Jacket',10),line('-',25)],{'40427':4});
+assert.equal(result.items[0].slot,'身體');assert.equal(result.items[0].dye,'未辨識染色（OCR）');
+result=ctx.assembleOCRItems([line('Baronial Jacket',10),line('Shale Brown',25)],{'40427':4});
+assert.equal(result.items[0].dye,'頁岩棕染劑');console.log('OCR 部位及染色匹配檢查通過');
+ctx.matchEquipment=item=>({id:item.id,names:{tc:item.name_zh},matchType:item.fuzzy?'fuzzy':'exact'});
+const rules={a:{jobs:['SAM']},b:{jobs:['WHM']},c:{fits:'Viera ♀'}};
+assert.match(ctx.equipmentRestrictionNote([{id:'a'},{id:'b'}],rules),/不同職業/);
+assert.equal(ctx.equipmentRestrictionNote([{id:'a'},{id:'a'}],rules),'');
+assert.match(ctx.equipmentRestrictionNote([{id:'c',name_zh:'維艾拉熱褲',fuzzy:true}],rules),/疑似匹配.*維艾拉族 女性角色/);
+console.log('跨職業、種族性別與疑似匹配提醒檢查通過');
