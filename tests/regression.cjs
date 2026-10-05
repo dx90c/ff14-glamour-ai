@@ -107,7 +107,7 @@ assert.equal(google(html),google(fs.readFileSync('old/FF14外觀AI辨識小工�
   assert.ok(run('cachedCustomDb.provenance.find(p=>p.repo===ITEM_REPO).fetchedAt'));
   assert.equal(run('cachedCustomDb.sources[1].length'),actualBefore.sources[1].length);
   context.calls=[];context.failSource=true;
-  run("cachedCustomDb.provenance=[];repositoryVersion=async repo=>({sha:repo,label:repo,date:'2026-10-04'});syncDatabasePart=async(repo,version)=>{calls.push(repo);if(repo===TEAMCRAFT_REPO && failSource)throw Error('download failed');const db=structuredClone(cachedCustomDb);db.provenance=db.provenance.filter(p=>p.repo!==repo);db.provenance.push({repo,commit:version.sha,label:version.label});await saveDatabaseToIDB(db);return db}");
+  run("cachedCustomDb.provenance=[];repositoryVersion=async repo=>({sha:repo,label:repo,date:'2026-10-04'});syncDatabasePart=async(repo,version)=>{calls.push(repo);if(repo===TEAMCRAFT_REPO && failSource)throw Error('download failed');const db=structuredClone(cachedCustomDb);db.provenance=db.provenance.filter(p=>p.repo!==repo);db.provenance.push({repo,commit:version.sha,label:version.label});db.ocrSupport ||= {commits:{}};db.ocrSupport.commits ||= {};db.ocrSupport.commits[repo]=version.sha;await saveDatabaseToIDB(db);return db}");
   await run('syncAllDatabases()');
   assert.equal(context.calls.length,3);
   assert.equal(run('cachedCustomDb.provenance.length'),2);
@@ -117,6 +117,10 @@ assert.equal(google(html),google(fs.readFileSync('old/FF14外觀AI辨識小工�
   assert.equal(run('cachedCustomDb.provenance.length'),3);
   context.calls.length=0;await run('syncAllDatabases()');assert.equal(context.calls.length,0);
   assert.equal(run('databaseSyncBusy'),false);
+  run("delete cachedCustomDb.ocrSupport.commits[ITEM_REPO]");
+  context.calls.length=0;await run('syncAllDatabases()');
+  assert.deepEqual(context.calls,['InfSein/ffxiv-datamining-mixed']);
+  context.calls.length=0;await run('syncAllDatabases()');assert.equal(context.calls.length,0);
   context.fullDb=JSON.parse(fs.readFileSync('ff14_database.json','utf8'));
   run('cachedCustomDb=validateDatabase(fullDb)');
   run('renderDatabaseVersions()');

@@ -1377,7 +1377,7 @@
   const TEAMCRAFT_REPO = 'ffxiv-teamcraft/ffxiv-teamcraft';
   const TEAMCRAFT_FILES = {
     items:'libs/data/src/lib/json/items.json', zhItems:'libs/data/src/lib/json/zh/zh-items.json',
-    twItems:'libs/data/src/lib/json/tw/tw-items.json', equipSlots:'libs/data/src/lib/json/item-equip-slot-category.json',
+    equipment:'libs/data/src/lib/json/equipment.json', twItems:'libs/data/src/lib/json/tw/tw-items.json', equipSlots:'libs/data/src/lib/json/item-equip-slot-category.json',
     extracts:'libs/data/src/lib/extracts/extracts.json', instances:'libs/data/src/lib/json/instances.json',
     zhInstances:'libs/data/src/lib/json/zh/zh-instances.json', twInstances:'libs/data/src/lib/json/tw/tw-instances.json',
     npcs:'libs/data/src/lib/json/npcs.json', zhNpcs:'libs/data/src/lib/json/zh/zh-npcs.json',
@@ -1519,6 +1519,16 @@
       }
       for (const lang of Object.keys(record.names)) db.languages[lang] = {commit:version.sha};
     }
+    db.ocrSupport = structuredClone(previous?.ocrSupport || {slots:{},restrictions:{},commits:{}});
+    db.ocrSupport.slots = structuredClone(data.equipSlots);
+    db.ocrSupport.restrictions ||= {};
+    for (const restriction of Object.values(db.ocrSupport.restrictions)) delete restriction.jobs;
+    for (const [id,entry] of Object.entries(data.equipment || {})) {
+      if (db.records[id] && Array.isArray(entry.jobs) && entry.jobs.length)
+        (db.ocrSupport.restrictions[id] ||= {}).jobs = [...entry.jobs];
+    }
+    db.ocrSupport.commits ||= {};
+    if (data.equipment) db.ocrSupport.commits[TEAMCRAFT_REPO] = version.sha;
     db.sources = buildTeamcraftSources(data,db.records);
     // Supplemental data is only a fallback for IDs without Teamcraft acquisition records.
     for (const [id,list] of Object.entries(previous?.sources || {})) {
@@ -1655,6 +1665,12 @@
     for (const [id,record] of Object.entries(db.records)) for (const name of [...Object.values(record.names),...(record.aliases || [])]) {
       const key = normalizeItemName(name); const ids = db.items[key] ||= []; if (!ids.includes(id)) ids.push(id);
     }
+    db.ocrSupport ||= {slots:{},restrictions:{},commits:{}};
+    db.ocrSupport.restrictions ||= {};
+    for (const restriction of Object.values(db.ocrSupport.restrictions)) delete restriction.fits;
+    for (const [id,restriction] of Object.entries(fresh.ocrSupport?.restrictions || {}))
+      Object.assign(db.ocrSupport.restrictions[id] ||= {},restriction);
+    db.ocrSupport.commits = {...db.ocrSupport.commits,...fresh.ocrSupport?.commits};
     db.languages = {...db.languages,...fresh.languages};
     return db;
   }
@@ -1666,7 +1682,13 @@
       if (blob.encoding !== 'base64') throw new Error('名稱檔格式錯誤');
       texts[lang] = new TextDecoder().decode(Uint8Array.from(atob(blob.content),c=>c.charCodeAt(0)));
     }));
-    return buildDatabase(texts,version);
+    const db = buildDatabase(texts,version);
+    db.ocrSupport = {restrictions:{},commits:{[ITEM_REPO]:version.sha}};
+    for (const row of readSheet(texts.en,['Description'])) {
+      const fits = row.Description?.match(/Fits:\s*([^\n]+)/)?.[1]?.trim();
+      if (fits && db.records[row.id]) db.ocrSupport.restrictions[row.id] = {fits};
+    }
+    return db;
   }
   async function syncDatabasePart(repo,version,progress) {
     const previous = getCustomDatabase(); let db;
@@ -1724,7 +1746,7 @@
           const version = await repositoryVersion(repo);
           remoteDatabaseVersions[repo] = version;
           const installed = getCustomDatabase()?.provenance?.find(p=>p.repo === repo);
-          if (installed?.commit === version.sha) {
+          if (installed?.commit === version.sha && (![ITEM_REPO,TEAMCRAFT_REPO].includes(repo) || getCustomDatabase()?.ocrSupport?.commits?.[repo] === version.sha)) {
             if (!installed.label || !installed.dataDate || (!installed.gameVersion && version.gameVersion)) {
               const db = structuredClone(getCustomDatabase());
               Object.assign(db.provenance.find(p=>p.repo === repo),{label:version.label,dataDate:version.date,gameVersion:version.gameVersion,gameVersionBasis:version.gameVersionBasis});
