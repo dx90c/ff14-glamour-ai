@@ -1,0 +1,23 @@
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ExcelJS=require('../xlsx/exceljs.min.js');
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const source=html.split('// === [SECTION: JS_XLSX_EXPORT] START ===')[1].split('// === [SECTION: JS_XLSX_EXPORT] END ===')[0];
+const ctx=vm.createContext({Date});vm.runInContext(source,ctx);
+(async()=>{
+ const date=new Date(2026,9,7,15,30,42);
+ assert.equal(ctx.outfitFileName('免費 OCR 外觀辨識','日影蘭治癒長衣',date),'20261007日影蘭治癒長衣_153042.xlsx');
+ assert.equal(ctx.outfitFileName('標題:男爵/外套','備援',date),'20261007標題_男爵_外套_153042.xlsx');
+ assert.equal(ctx.outfitFileName('','',date),'20261007FF14外觀筆記_153042.xlsx');
+ assert(!html.includes('copyToClipboard'));
+ const row={slot:'身體',name:'測試外套（疑似匹配；原辨識：測式外套）',original:'Test Coat',source:'任務獎勵：測試任務',dye:'① 頁岩棕染劑 / ② 頁岩棕染劑',wiki:'https://ff14.huijiwiki.com/wiki/test',google:'https://www.google.com/search?q=test'};
+ const image={width:1,height:1,dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aQ1cAAAAASUVORK5CYII='};
+ const wb=await ctx.buildOutfitXlsx(ExcelJS,{title:'匯出測試',rows:[row],note:'測試限制提醒',image});
+ const restored=new ExcelJS.Workbook();await restored.xlsx.load(await wb.xlsx.writeBuffer());
+ const s=restored.getWorksheet('衣服外觀');
+ assert.equal(s.getCell('B5').value.text,row.name);assert.equal(s.getCell('B5').value.hyperlink,row.wiki);
+ assert.equal(s.getCell('C5').value.hyperlink,row.google);assert.equal(s.getCell('D5').value,row.source);
+ assert.equal(s.getCell('E5').value,row.dye);assert.equal(s.getImages().length,1);
+ assert.equal(s.getImages()[0].range.tl.nativeCol,5);
+ assert.equal(s.getImages()[0].range.ext.width,s.getImages()[0].range.ext.height);
+ console.log('PASS: XLSX 日期命名、標題備援、特殊字元、三顆按鈕、疑似匹配、來源、雙染色、連結與 F 欄含圖。');
+})().catch(error=>{console.error(error);process.exitCode=1;});

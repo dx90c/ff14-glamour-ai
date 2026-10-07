@@ -1,0 +1,23 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const matches={'Baronial Jacket':{id:'1',matchType:'exact'},'男爵外套':{id:'1',matchType:'exact'},'Other Gloves':{id:'2',matchType:'exact'}};
+const context={console,lookupSingleOfficialDye:text=>({'Shale Brown':'頁岩棕染劑','シェールブラウン':'頁岩棕染劑'})[text]||null,matchEquipment:item=>matches[item.name_zh]||null};
+vm.createContext(context);vm.runInContext(fs.readFileSync(require('path').join(__dirname,'ocr-integration-source.js'),'utf8'),context);
+const line=(text,x,y,w=130,h=12)=>({text,score:.95,poly:[[x,y],[x+w,y],[x+w,y+h],[x,y+h]]});
+const slots={'1':4,'2':5};
+let data=context.assembleOCRItems([line('Baronial Jacket',10,10),line('男爵外套',10,25),line('① Shale Brown',10,42),line('② Shale Brown',10,59)],slots);
+assert.equal(data.items.length,1);assert.equal(data.items[0].dye,'① 頁岩棕染劑 / ② 頁岩棕染劑');
+data=context.assembleOCRItems([line('Baronial Jacket',10,10),line('Other Gloves',10,60),line('Shale Brown',10,78)],slots);
+assert.equal(data.items[0].dye,'未辨識染色（OCR）');assert.equal(data.items[1].dye,'頁岩棕染劑');
+data=context.assembleOCRItems([line('Baronial Jacket',10,10),line('Shale Brown',10,28),line('シェールブラウン',10,44)],slots);
+assert.equal(data.items[0].dye,'頁岩棕染劑');
+data=context.assembleOCRItems([line('Baronial Jacket',10,10),line('Baronial Jacket',350,10)],slots);assert.equal(data.items.length,2);
+let closed=false;
+context.createImageBitmap=async()=>({width:1000,height:1000,close(){closed=true;}});
+context.document={createElement:()=>({getContext:()=>({drawImage(){}})})};
+(async()=>{
+ const original=[line('Baronial Jacket',10,10),line('Unreadable Name',10,30)];let calls=0;
+ const result=await context.refineOCRLines({},original,slots,async()=>{calls++;return {items:[line('Other Gloves',0,0)]};});
+ assert.equal(calls,1);assert.equal(result[0],original[0]);assert.ok(result.some(l=>l.text==='Other Gloves'));assert.ok(closed);
+ const failure=await context.refineOCRLines({},original,slots,async()=>{throw Error('test');});assert.equal(failure[1],original[1]);
+ console.log('PASS: 雙語裝備、兩槽同色、染劑歸屬、雙語染劑、分開重複裝備、區域重讀及失敗保留');
+})();

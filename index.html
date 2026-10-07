@@ -27,14 +27,14 @@
 10. [SECTION: JS_TEAMCRAFT_DATABASE]
     - Teamcraft JSON 固定版本下載、精確 ID 對接、繁中名稱、任務／製作／兌換／物品箱來源。
 11. [SECTION: JS_UI_RENDER_EXPORT]
-    - 辨識結果渲染 (renderResult)、一鍵複製至 Excel、下載 CSV (含 UTF-8 BOM) 與 TXT 筆記匯出。
+    - 辨識結果渲染 (renderResult)、含圖 XLSX、下載 CSV (含 UTF-8 BOM) 與 TXT 筆記匯出。
 ================================================================================
 -->
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 v2.4.1</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 v2.4.3</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -789,7 +789,7 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.4.1版</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.4.3版</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
@@ -816,8 +816,8 @@
     </div>
   </div>
 
-  <p style="font-size:0.85rem"><a href="./FF14外觀AI辨識小工具.html" download>下載 HTML</a> · <a href="./ff14_database.json" download>下載裝備庫 JSON</a></p>
-<!-- Upload Area -->
+  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/archive/refs/heads/main.zip">下載完整檔案</a> · <a href="./FF14外觀AI辨識小工具.html" download>下載 HTML</a> · <a href="./ff14_database.json" download>下載裝備庫 JSON</a></p>
+  <!-- Upload Area -->
   <div class="upload-card" id="dropZone" onclick="triggerFileInput()">
     <div class="upload-icon">📸</div>
     <div class="upload-title">點擊或拖放外觀截圖至此處（支援剪貼簿 Ctrl+V 貼上）</div>
@@ -843,7 +843,7 @@
     <div class="result-header">
       <div class="outfit-title" id="outfitTitle">【套裝】復古大地色系優雅侍者長裙風</div>
       <div class="action-buttons">
-        <button class="btn btn-success" onclick="copyToClipboard()">📋 一鍵複製到 Excel</button>
+        <button class="btn btn-primary" onclick="downloadXLSX(this)">💾 儲存 XLSX（含圖）</button>
         <button class="btn btn-primary" onclick="downloadCSV()">💾 下載 CSV 表格</button>
         <button class="btn btn-secondary" onclick="downloadTXT()">📝 下載 TXT 筆記</button>
       </div>
@@ -1005,12 +1005,12 @@
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.4.1 版本設定
+  // 全域狀態與 v2.4.3 版本設定
   const BUILTIN_VERSION = {
-    version: "v2.4.1",
-    sha: "builtin-v2.4.1",
-    date: "2026-10-04",
-    label: "v2.4.1版"
+    version: "v2.4.3",
+    sha: "builtin-v2.4.3",
+    date: "2026-10-07",
+    label: "v2.4.3版"
   };
 
   // 1. 初始化
@@ -1798,7 +1798,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.4.1 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.4.3 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -1924,6 +1924,7 @@ async function callLocalOCR(file) {
     if(!getCustomDatabase()?.records)throw new Error('請先在裝備庫匯入或同步完整 JSON，再進行 OCR 辨識');
     document.getElementById('loadingMsg').textContent='載入免費 OCR 模型與辨識圖片…';
     appendStatusLog('免費 OCR','圖片在本機瀏覽器辨識；首次需下載模型','info');
+    if(location.protocol==='file:')throw new Error('免費 OCR 需要透過 HTTP(S) 網址開啟。請使用線上版；直接雙擊下載的 HTML 僅可使用 AI 模式。');
     await loadPaddleEngine();
     const {recognize}=window.FF14OCR;
     const db=getCustomDatabase();
@@ -1931,11 +1932,12 @@ async function callLocalOCR(file) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.1 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.3 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
     const result=await recognize(file);
-    const data=assembleOCRItems(result.items,slots);
+    const refined=await refineOCRLines(file,result.items,slots,recognize);
+    const data=assembleOCRItems(refined,slots);
     data.note=equipmentRestrictionNote(data.items,restrictions.items);
     if(!data.items.length)throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');
     renderResult(data);currentOutfitData=data;
@@ -1959,30 +1961,100 @@ function equipmentRestrictionNote(items,restrictions) {
   }
   return [...new Set(notes)].join(' ');
 }
+// === [SECTION: JS_OCR_REFINEMENT] START ===
+function ocrBox(line) {
+  const xs=line.poly.map(p=>p[0]),ys=line.poly.map(p=>p[1]);
+  return {x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
+}
+function ocrDye(line) {
+  const raw=line.text.trim();
+  const prefix=raw.match(/^([①②]|[12])\s*[-:：.)]?\s*(.+)$/);
+  const text=prefix?prefix[2]:raw;
+  if(!/[\p{L}]/u.test(text))return null;
+  const name=lookupSingleOfficialDye(text);
+  return name?{name,channel:prefix?({'①':1,'②':2}[prefix[1]]||Number(prefix[1])):null}:null;
+}
+function ocrGear(line,slots) {
+  if(line.score<0.5 || ocrDye(line))return null;
+  const match=matchEquipment({name_zh:line.text.trim(),name_en_jp:''});
+  return match?.id&&slots[match.id]?match:null;
+}
+async function refineOCRLines(file,lines,slots,recognize) {
+  const gears=lines.map(line=>({line,match:ocrGear(line,slots),b:ocrBox(line)})).filter(x=>x.match);
+  // ponytail: bounded retries, extend only after real screenshots demonstrate missed regions.
+  const retry=lines.filter(line=>{
+    if(ocrGear(line,slots)?.matchType==='exact'||ocrDye(line))return false;
+    if(!/[\p{L}]/u.test(line.text)||line.text.trim().length<3)return false;
+    const b=ocrBox(line);
+    return (b.h<32||line.score<0.8)&&(gears.length?gears.some(g=>Math.abs(b.x+b.w/2-g.b.x-g.b.w/2)<Math.max(b.w,g.b.w)*0.7&&Math.abs(b.y-g.b.y)<Math.max(120,g.b.h*10)):b.h<24&&line.text.trim().length>=5);
+  }).slice(0,8);
+  if(!retry.length)return lines;
+  const bitmap=await createImageBitmap(file);const improved=[...lines];
+  try{
+    for(const original of retry){
+      const b=ocrBox(original),padding=Math.max(4,b.h*.4);
+      const x=Math.max(0,b.x-padding),y=Math.max(0,b.y-padding);
+      const w=Math.min(bitmap.width-x,b.w+padding*2),h=Math.min(bitmap.height-y,b.h+padding*2);
+      if(w<=0||h<=0)continue;
+      const scale=Math.min(3,2400/w,600/h);if(scale<=1)continue;
+      const canvas=document.createElement('canvas');canvas.width=Math.ceil(w*scale);canvas.height=Math.ceil(h*scale);
+      canvas.getContext('2d').drawImage(bitmap,x,y,w,h,0,0,canvas.width,canvas.height);
+      try{
+        const result=await recognize(canvas);
+        const candidates=result.items.map(line=>({...line,poly:line.poly.map(p=>[x+p[0]/scale,y+p[1]/scale])}));
+        const before=ocrGear(original,slots);
+        const usable=candidates.filter(line=>{
+          const after=ocrGear(line,slots);
+          return after?(!before||before.id===after.id):(ocrDye(line)&&!before);
+        });
+        const ids=new Set(usable.map(line=>ocrGear(line,slots)?.id).filter(Boolean));
+        if(ids.size>1)continue;
+        if(usable.length){improved.splice(improved.indexOf(original),1,...usable);}
+      }catch(error){console.warn('OCR 區域重讀未完成，保留原結果',error);}
+    }
+  }finally{bitmap.close();}
+  return improved;
+}
 function assembleOCRItems(lines,slots) {
   const slotNames={1:'主手',2:'副手',3:'頭部',4:'身體',5:'手部',6:'腰部',7:'腿部',8:'腳部',9:'耳飾',10:'項鍊',11:'手環',12:'戒指',13:'戒指'};
-  const box=line=>{const xs=line.poly.map(p=>p[0]),ys=line.poly.map(p=>p[1]);return {x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};};
-  const matches=[];
+  const groups=[];
   for(const line of lines){
-    if(line.score<0.5)continue;
-    const raw=line.text.trim();if(lookupSingleOfficialDye(raw))continue;
-    const match=matchEquipment({name_zh:raw,name_en_jp:''});
-    if(!match?.id || !slotNames[slots[match.id]])continue;
-    const old=matches.find(x=>x.match.id===match.id);
-    const candidate={line,match,b:box(line)};
-    if(!old)matches.push(candidate);
-    else if(match.matchType==='exact' && old.match.matchType!=='exact' || match.matchType===old.match.matchType && line.score>old.line.score)Object.assign(old,candidate);
+    const match=ocrGear(line,slots);if(!match||!slotNames[slots[match.id]])continue;
+    const b=ocrBox(line);
+    // Merge nearby bilingual labels, but retain separately displayed identical equipment.
+    let group=groups.find(g=>g.match.id===match.id&&g.labels.some(l=>{const q=ocrBox(l);return Math.abs(q.y-b.y)<Math.max(q.h,b.h)*4&&Math.abs(q.x+q.w/2-b.x-b.w/2)<Math.max(q.w,b.w)*.7;}));
+    if(!group){groups.push({match,line,labels:[line],dyes:[]});continue;}
+    group.labels.push(line);
+    if(match.matchType==='exact'&&group.match.matchType!=='exact'||match.matchType===group.match.matchType&&line.score>group.line.score){group.line=line;group.match=match;}
   }
-  const items=matches.map(({line,match,b})=>{
-    const dyeLines=lines.filter(other=>{
-      const q=box(other);return other.score>=0.5 && /[\p{L}]/u.test(other.text) && q.y>b.y+b.h/2 && q.y<b.y+Math.max(b.h*7,55) && Math.abs(q.x+q.w/2-b.x-b.w/2)<Math.max(b.w*0.75,45) && lookupSingleOfficialDye(other.text.trim());
-    }).filter(other=>!matches.some(m=>m.match.id!==match.id && m.b.y>b.y && m.b.y<box(other).y && Math.abs(m.b.x-b.x)<Math.max(b.w,45)));
-    const dyes=[...new Set(dyeLines.map(x=>lookupSingleOfficialDye(x.text.trim())))];
-    return {slot:slotNames[slots[match.id]],name_zh:line.text,name_en_jp:'',name_huiji:'',source:'',dye:dyes.length?dyes.join(' / '):'未辨識染色（OCR）'};
+  for(const line of lines){
+    const dye=ocrDye(line);if(!dye||line.score<.5)continue;
+    const b=ocrBox(line);
+    const candidates=groups.map(group=>{
+      const boxes=group.labels.map(ocrBox),bottom=Math.max(...boxes.map(q=>q.y+q.h));
+      const last=boxes.reduce((a,q)=>q.y>a.y?q:a),dy=b.y-bottom;
+      const dx=Math.abs(b.x+b.w/2-last.x-last.w/2);
+      const width=Math.max(last.w,b.w,45);
+      return {group,dy,dx,width,valid:dy>=-Math.min(b.h,last.h)*.25&&dy<Math.max(55,last.h*7)&&dx<width*.7};
+    }).filter(c=>c.valid).sort((a,b)=>(a.dy+a.dx*.5)-(b.dy+b.dx*.5));
+    if(!candidates.length)continue;
+    if(candidates[1]&&Math.abs((candidates[0].dy+candidates[0].dx*.5)-(candidates[1].dy+candidates[1].dx*.5))<b.h*.5)continue;
+    candidates[0].group.dyes.push({...dye,b});
+  }
+  const items=groups.map(group=>{
+    const marked=group.dyes.filter(d=>d.channel),plain=group.dyes.filter(d=>!d.channel).sort((a,b)=>a.b.y-b.b.y);
+    const channels=new Map();
+    for(const d of marked){const old=channels.get(d.channel);channels.set(d.channel,old&&old!==d.name?'未辨識染色（OCR）':d.name);}
+    let dye;
+    if(channels.size)dye=[1,2].filter(n=>channels.has(n)).map(n=>`${n===1?'①':'②'} ${channels.get(n)}`).join(' / ');
+    else dye=[...new Set(plain.map(d=>d.name))].join(' / ')||'未辨識染色（OCR）';
+    return {slot:slotNames[slots[group.match.id]],name_zh:group.line.text,name_en_jp:'',name_huiji:'',source:'',dye};
   });
   items.sort((a,b)=>Object.values(slotNames).indexOf(a.slot)-Object.values(slotNames).indexOf(b.slot));
   return {outfit_title:'免費 OCR 外觀辨識',note:'',items};
 }
+// === [SECTION: JS_OCR_REFINEMENT] END ===
+
 // === [SECTION: JS_LOCAL_OCR] END ===
 
 // === [SECTION: JS_AI_DISPATCHER] START ===
@@ -2696,32 +2768,121 @@ function assembleOCRItems(lines,slots) {
     document.getElementById("resultSection").scrollIntoView({ behavior: 'smooth' });
   }
 
-  // 5. 匯出功能（一鍵複製到 Excel、下載 CSV、下載 TXT）
-  function copyToClipboard() {
-    if (!currentOutfitData) return;
+  // 5. 匯出功能（含圖 XLSX、下載 CSV、下載 TXT）
+// === [SECTION: JS_XLSX_EXPORT] START ===
+// Shared by the browser and local export checks. ExcelJS is loaded only on export.
+function outfitFileName(title, bodyName, date = new Date()) {
+  const generic = /^(?:免費\s*OCR.*|FF14\s*外觀.*|未命名.*)$/i;
+  const name = title && !generic.test(title.trim()) ? title : bodyName || 'FF14外觀筆記';
+  const safe = String(name).replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/[.\s]+$/g, '').trim().slice(0,80) || 'FF14外觀筆記';
+  const pad = n => String(n).padStart(2,'0');
+  return `${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}${safe}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.xlsx`;
+}
 
-    let lines = [];
-    lines.push(["部位", "繁中裝備名稱", "外語原名（英／日／法／德）", "取得方式", "染色設定", "灰機wiki網址"].join("\t"));
-    (currentOutfitData.items || []).forEach(it => {
-      const wikiInfo = getHuijiWikiUrl(it);
-      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
-      const gearName = matchedEquipmentExportName(it, (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh));
-      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
-      const sourceInfo = resolveEquipmentSource(it);
-      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
-      lines.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].join("\t"));
+async function buildOutfitXlsx(ExcelJS, data) {
+  if (!data.rows?.length) throw new Error('沒有可匯出的裝備結果');
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'FF14 外觀筆記';
+  const sheet = workbook.addWorksheet('衣服外觀', {views:[{showGridLines:false}], pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  // A–F follows the personal outfit workbook; image remains in F.
+  const widths = [10,27,34,58,27,43];
+  sheet.columns = widths.map(width=>({width}));
+  sheet.getRow(1).height = 12;
+  sheet.mergeCells('A2:E2');
+  const title = sheet.getCell('A2');
+  title.value = data.title || data.bodyName || 'FF14外觀筆記';
+  title.font = {name:'Microsoft JhengHei',size:16,bold:true,color:{argb:'FF203449'}};
+  title.alignment = {vertical:'middle',wrapText:true};
+  sheet.getRow(2).height = Math.max(32,Math.ceil([...String(title.value)].length/65)*23);
+  sheet.getRow(3).height = 10;
+  const headings = ['部位','繁中裝備名稱','外語原名','取得方式','染色設定'];
+  headings.forEach((text,i)=>{
+    const cell = sheet.getCell(4,i+1);cell.value=text;
+    cell.font={name:'Microsoft JhengHei',size:11,bold:true,color:{argb:'FFFFFFFF'}};
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF29465C'}};
+    cell.alignment={vertical:'middle',horizontal:'center'};
+  });
+  sheet.getRow(4).height=27;
+  const lineCount = (text,width) => String(text||'').split('\n').reduce((total,line)=>{
+    const units=[...line].reduce((n,ch)=>n+(ch.charCodeAt(0)>255?2:1),0);
+    return total+Math.max(1,Math.ceil(units/(width-3)));
+  },0);
+  data.rows.forEach((row,i)=>{
+    const n=i+5;
+    const values=[row.slot,row.name,row.original,row.source,row.dye];
+    sheet.getRow(n).height=Math.max(54,...values.map((v,c)=>lineCount(v,widths[c])*17+16));
+    values.forEach((value,c)=>{
+      const cell=sheet.getCell(n,c+1);
+      cell.value=String(value||'');
+      cell.font={name:'Microsoft JhengHei',size:11,color:{argb:c===3?'FF007C61':'FF24374B'},bold:c===1};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:i%2?'FFF2F5F8':'FFFFFFFF'}};
+      cell.alignment={vertical:'middle',wrapText:true,horizontal:c===0?'center':'left'};
+      cell.border={bottom:{style:'hair',color:{argb:'FFDCE3EA'}}};
     });
-    if (currentOutfitData.note) {
-      lines.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].join("\t"));
-    }
-
-    const textToCopy = lines.join("\n");
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      showToast("📋 已複製表格（含灰機直連網址）！在 Excel 按 Ctrl+V 即可貼上！");
-    }).catch(err => {
-      alert("複製失敗，請手動反白選取。");
-    });
+    // Keep real links and all names, without adding extra visible columns.
+    if (/^https?:\/\//.test(row.wiki||'')) sheet.getCell(n,2).value={text:row.name,hyperlink:row.wiki};
+    if (/^https?:\/\//.test(row.google||'')) sheet.getCell(n,3).value={text:row.original||'Google 搜尋',hyperlink:row.google};
+  });
+  let last=data.rows.length+4;
+  if(data.note){
+    ++last;sheet.mergeCells(`A${last}:E${last}`);
+    const cell=sheet.getCell(last,1);cell.value='穿搭提醒：'+data.note;
+    cell.font={name:'Microsoft JhengHei',size:10,color:{argb:'FF85641A'}};
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7E0'}};
+    cell.alignment={wrapText:true,vertical:'middle'};
+    sheet.getRow(last).height=Math.max(30,lineCount(cell.value,140)*16+12);
   }
+  if(data.image){
+    // ExcelJS column width includes padding; Calibri 11 default has 7px digit width.
+    const imageWidth=widths[5]*7;
+    const imageHeight=Array.from({length:last-1},(_,i)=>sheet.getRow(i+2).height||15).reduce((a,b)=>a+b,0)*4/3;
+    const scale=Math.min(imageWidth/data.image.width,imageHeight/data.image.height);
+    const width=data.image.width*scale,height=data.image.height*scale;
+    sheet.mergeCells(`F2:F${last}`);
+    const id=workbook.addImage({base64:data.image.dataUrl,extension:'png'});
+    sheet.addImage(id,{tl:{col:5+(imageWidth-width)/2/imageWidth,row:1},ext:{width,height},editAs:'oneCell'});
+  }
+  sheet.pageSetup.printArea=`A1:F${last}`;
+  return workbook;
+}
+
+let excelJsLoad;
+async function downloadXLSX(button) {
+  if(!currentOutfitData)return;
+  const oldLabel=button?.textContent;
+  if(button){button.disabled=true;button.textContent='正在儲存…';}
+  try {
+    if(!window.ExcelJS){
+      excelJsLoad ||= new Promise((resolve,reject)=>{
+        const script=document.createElement('script');script.src='./xlsx/exceljs.min.js';
+        script.onload=resolve;script.onerror=()=>{script.remove();excelJsLoad=null;reject(new Error('無法載入 XLSX 匯出元件，請確認 xlsx 資料夾完整。'));};
+        document.head.appendChild(script);
+      });
+      await excelJsLoad;
+    }
+    const rows=currentOutfitData.items.map(it=>{
+      const source=resolveEquipmentSource(it);
+      return {slot:it.slot,name:matchedEquipmentExportName(it,it.resolved_name||it.name_zh),
+        original:it.name_en_jp||(it.resolved_name!==it.name_zh?it.name_zh:''),
+        source:source.isVerified?source.sourceText:source.sourceText+'（未收錄，請查灰機）',
+        dye:translateDyeSetting(it.dye||it.dye_setting||''),wiki:getHuijiWikiUrl(it).url,google:getGoogleHuijiUrl(it)};
+    });
+    const body=currentOutfitData.items.find(it=>/^(身體|身|身體部位)$/.test(it.slot));
+    const bodyName=body?(matchEquipment(body)?.names.tc||body.resolved_name||body.name_zh):rows[0]?.name;
+    const preview=document.getElementById('previewImg');
+    if(!preview?.naturalWidth)throw new Error('原圖尚未載入，請稍後再試');
+    const canvas=document.createElement('canvas');canvas.width=preview.naturalWidth;canvas.height=preview.naturalHeight;
+    canvas.getContext('2d').drawImage(preview,0,0);
+    const title=currentOutfitData.outfit_title;
+    const generic=/^(?:免費\s*OCR.*|FF14\s*外觀.*|未命名.*)$/i.test(title||'');
+    const workbook=await buildOutfitXlsx(window.ExcelJS,{title:generic?bodyName:title,bodyName,rows,note:currentOutfitData.note,
+      image:{dataUrl:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height}});
+    downloadBlob(new Blob([await workbook.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),outfitFileName(title,bodyName));
+    showToast('已儲存含圖片的 XLSX');
+  }catch(error){alert('XLSX 儲存失敗：'+error.message);}
+  finally{if(button){button.disabled=false;button.textContent=oldLabel;}}
+}
+// === [SECTION: JS_XLSX_EXPORT] END ===
 
   function downloadCSV() {
     if (!currentOutfitData) return;
