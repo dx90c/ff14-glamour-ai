@@ -18,8 +18,8 @@ async function callLocalOCR(file) {
   try {
 
     if(!getCustomDatabase()?.records)throw new Error('請先在裝備庫匯入或同步完整 JSON，再進行 OCR 辨識');
-    document.getElementById('loadingMsg').textContent='載入免費 OCR 模型與辨識圖片…';
-    appendStatusLog('免費 OCR','圖片在本機瀏覽器辨識；首次需下載模型','info');
+    document.getElementById('loadingMsg').textContent='準備文字辨識模型並辨識圖片…';
+    appendStatusLog('免費 OCR','圖片在本機瀏覽器辨識；模型由本站取得，快取可用時直接重用','info');
     if(location.protocol==='file:')throw new Error('免費 OCR 需要透過 HTTP(S) 網址開啟。請使用線上版；直接雙擊下載的 HTML 僅可使用 AI 模式。');
     await loadPaddleEngine();
     const {recognize}=window.FF14OCR;

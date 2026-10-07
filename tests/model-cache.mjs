@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { cachedModelFetch } from '../ocr-src/model-cache.js';
+const originalFetch=globalThis.fetch;
+let calls=0;const stored=new Map();
+globalThis.caches={async open(){return {async match(url){return stored.get(url)?.clone()},async put(url,response){stored.set(url,response)}}}};
+globalThis.fetch=async()=>{calls++;return new Response('model')};
+const url='https://example.test/ocr/models/test-hash.tar';
+assert.equal(await(await cachedModelFetch(url)).text(),'model');
+assert.equal(await(await cachedModelFetch(url)).text(),'model');assert.equal(calls,1);
+globalThis.caches={async open(){throw Error('disabled')}};
+assert.equal(await(await cachedModelFetch(url)).text(),'model');assert.equal(calls,2);
+globalThis.caches={async open(){return {async match(){},async put(){throw Error('quota')}}}};
+assert.equal(await(await cachedModelFetch(url)).text(),'model');
+globalThis.fetch=async()=>new Response('missing',{status:404});
+assert.equal((await cachedModelFetch(url)).status,404);
+globalThis.fetch=originalFetch;
+console.log('PASS: 模型首次取得、快取重用、快取禁用、容量不足與 HTTP 失敗。');
