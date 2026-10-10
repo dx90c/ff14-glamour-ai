@@ -2,7 +2,7 @@
 
 讀取**附有裝備名稱文字**的 FF14 穿搭圖片，將名稱比對至裝備資料庫，整理取得方式與圖片中的染色資訊，方便查找與保存。
 
-[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/archive/refs/heads/main.zip) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/archive/refs/heads/main.zip) · [下載 HTML](https://dx90c.github.io/ff14-glamour-ai/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7.html) · [下載裝備庫 JSON](https://dx90c.github.io/ff14-glamour-ai/ff14_database.json)
+[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/archive/refs/heads/main.zip) · [下載 HTML](https://dx90c.github.io/ff14-glamour-ai/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7.html) · [下載裝備庫 JSON](https://dx90c.github.io/ff14-glamour-ai/ff14_database.json)
 
 ## 功能與限制
 
@@ -31,9 +31,17 @@
 
 如需使用 AI API，可在「辨識模型」設定中選擇 Gemini、ChatGPT（OpenAI API）或其他 OpenAI 相容服務，填入自己的 API Key。費用與額度依服務商規定，程式不會自動由 OCR 切換至 AI。
 
+### 圖片格式與操作示範
+
+請使用附有清楚裝備名稱的穿搭圖片。網頁尚未顯示成果時，可展開「查看圖片格式與操作示範」，並隨時收起。
+
+![拖入圖片並顯示結果的示意](assets/outfit-upload-demo.gif)
+
+XXXX 為佔位文字，不是實際辨識結果。
+
 ## 下載版與資料更新
 
-建議下載完整檔案並解壓縮，保留 `FF14外觀AI辨識小工具.html`、`ff14_database.json`、`ocr` 與 `xlsx` 資料夾的相對位置。若只下載 HTML 與 JSON，含圖 XLSX 匯出還需要同層的 `xlsx` 資料夾。雙擊 HTML 開啟後，首次需在裝備庫視窗手動匯入 JSON。
+建議下載完整檔案並解壓縮，保留 `FF14外觀AI辨識小工具.html`、`ff14_database.json`、`ocr`、`xlsx` 與 `assets` 資料夾的相對位置。若只下載 HTML 與 JSON，含圖 XLSX 匯出還需要同層的 `xlsx` 資料夾。雙擊 HTML 開啟後，首次需在裝備庫視窗手動匯入 JSON。
 
 **免費 OCR 需要 HTTP(S) 網址，不能直接從 `file://` 執行。**一般使用者請使用線上版；下載版直接雙擊 HTML 可使用 AI API。若自行架設本機 HTTP 伺服器，也可使用免費 OCR。免安裝的本機啟動器尚未提供。
 
@@ -61,9 +69,8 @@ API Key 儲存在本機瀏覽器。使用 AI API 時，圖片與驗證所需的 
 | [LuminaSupplemental](https://github.com/Critical-Impact/LuminaSupplemental) | 補充取得方式 | GPL-3.0 |
 | [OpenCC](https://github.com/BYVoid/OpenCC) | 簡繁字形輔助匹配 | Apache-2.0 |
 | [ExcelJS](https://github.com/exceljs/exceljs) | 含圖 XLSX 匯出 | MIT |
-| [ExcelJS](https://github.com/exceljs/exceljs) | 含圖 XLSX 匯出 | MIT |
 | [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | 圖片文字辨識 | Apache-2.0 |
 
 取得方式優先使用物品 ID 對應的來源記錄，不以 AI 推測內容作為已驗證來源。資料版本可在工具的裝備庫視窗查看。
 
-ExcelJS 授權見 [授權檔](xlsx/ExcelJS-LICENSE.txt)。ExcelJS 授權見 [授權檔](xlsx/ExcelJS-LICENSE.txt)。OCR 第三方授權見 [授權說明](ocr/THIRD_PARTY_NOTICES.md)，版本更新見 [CHANGELOG](CHANGELOG.md)。
+ExcelJS 授權見 [授權檔](xlsx/ExcelJS-LICENSE.txt)。OCR 第三方授權見 [授權說明](ocr/THIRD_PARTY_NOTICES.md)，版本更新見 [CHANGELOG](CHANGELOG.md)。

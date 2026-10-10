@@ -34,7 +34,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 v2.4.3</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 v2.4.4</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -789,7 +789,7 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.4.3版</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.4.4版</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
@@ -837,6 +837,14 @@
       <div id="statusLogList"></div>
     </div>
   </div>
+
+  <!-- 操作示範：未辨識時可展開，成果出現後收起 -->
+  <details id="uploadDemo" style="background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:24px">
+    <summary style="cursor:pointer;color:var(--primary);font-weight:600"><span id="uploadDemoLabel">查看圖片格式與操作示範</span></summary>
+    <p>請使用附有清楚裝備名稱的穿搭圖片。</p>
+    <img id="uploadDemoImage" data-src="assets/outfit-upload-demo.gif" alt="將附有裝備名稱的穿搭圖片拖入上傳區，再顯示結果表格的操作示意" width="1040" height="660" style="display:block;width:100%;height:auto;border-radius:8px">
+    <p style="font-size:0.85rem;color:#7f8c8d">操作示意；XXXX 為佔位文字，不是實際辨識結果。</p>
+  </details>
 
   <!-- Result Section -->
   <div class="result-section" id="resultSection">
@@ -1005,17 +1013,24 @@
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.4.3 版本設定
+  // 全域狀態與 v2.4.4 版本設定
   const BUILTIN_VERSION = {
-    version: "v2.4.3",
-    sha: "builtin-v2.4.3",
-    date: "2026-10-07",
-    label: "v2.4.3版"
+    version: "v2.4.4",
+    sha: "builtin-v2.4.4",
+    date: "2026-10-10",
+    label: "v2.4.4版"
   };
 
   // 1. 初始化
   window.addEventListener("DOMContentLoaded", async () => {
     updateKeyButtonState();
+  // GIF 僅在展開時載入；收合時停止播放。
+  document.getElementById('uploadDemo').addEventListener('toggle', function () {
+    const image = document.getElementById('uploadDemoImage');
+    document.getElementById('uploadDemoLabel').textContent = this.open ? '收起示範' : '查看圖片格式與操作示範';
+    if (this.open) image.src = image.dataset.src;
+    else image.removeAttribute('src');
+  });
     setupDropZone();
     setupClipboardPaste();
     const databaseDrop = document.getElementById('csvDropZone');
@@ -1798,7 +1813,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.4.3 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.4.4 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -1932,7 +1947,7 @@ async function callLocalOCR(file) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.3 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.4 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
     const result=await recognize(file);
@@ -2764,6 +2779,8 @@ function assembleOCRItems(lines,slots) {
       noteBox.style.display = "none";
     }
 
+    document.getElementById('uploadDemo').open = false;
+    document.getElementById('uploadDemo').hidden = true;
     document.getElementById("resultSection").style.display = "block";
     document.getElementById("resultSection").scrollIntoView({ behavior: 'smooth' });
   }
