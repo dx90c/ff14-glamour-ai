@@ -8,7 +8,7 @@ const ctx=vm.createContext({Date});vm.runInContext(source,ctx);
  assert.equal(ctx.outfitFileName('免費 OCR 外觀辨識','日影蘭治癒長衣',date),'20261007日影蘭治癒長衣_153042.xlsx');
  assert.equal(ctx.outfitFileName('標題:男爵/外套','備援',date),'20261007標題_男爵_外套_153042.xlsx');
  assert.equal(ctx.outfitFileName('','',date),'20261007FF14外觀筆記_153042.xlsx');
- assert(!html.includes('copyToClipboard'));
+ assert(!html.includes('copyToClipboard'));assert(html.includes('downloadPNG(this)'));assert(!html.includes('downloadTXT'));assert.equal((html.match(/<button[^>]*onclick="download/g)||[]).length,3);
  const row={slot:'身體',name:'測試外套（疑似匹配；原辨識：測式外套）',original:'Test Coat',source:'任務獎勵：測試任務',dye:'① 頁岩棕染劑 / ② 頁岩棕染劑',wiki:'https://ff14.huijiwiki.com/wiki/test',google:'https://www.google.com/search?q=test'};
  const image={width:1,height:1,dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aQ1cAAAAASUVORK5CYII='};
  const wb=await ctx.buildOutfitXlsx(ExcelJS,{title:'匯出測試',rows:[row],note:'測試限制提醒',image});

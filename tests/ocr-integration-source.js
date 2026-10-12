@@ -20,7 +20,7 @@ async function callLocalOCR(file) {
     if(!getCustomDatabase()?.records)throw new Error('請先在裝備庫匯入或同步完整 JSON，再進行 OCR 辨識');
     document.getElementById('loadingMsg').textContent='準備文字辨識模型並辨識圖片…';
     appendStatusLog('免費 OCR','圖片在本機瀏覽器辨識；模型由本站取得，快取可用時直接重用','info');
-    if(location.protocol==='file:')throw new Error('免費 OCR 需要透過 HTTP(S) 網址開啟。請使用線上版；直接雙擊下載的 HTML 僅可使用 AI 模式。');
+    if(location.protocol==='file:')throw new Error('免費 OCR 請解壓完整 ZIP 後執行 start.bat，或使用線上版；直接雙擊 HTML 僅可使用 AI 模式。');
     await loadPaddleEngine();
     const {recognize}=window.FF14OCR;
     const db=getCustomDatabase();
@@ -28,11 +28,20 @@ async function callLocalOCR(file) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.3 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.5.0 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
-    const result=await recognize(file);
-    const refined=await refineOCRLines(file,result.items,slots,recognize);
+    let result=await recognize(file),language='default';
+    if(result.items.filter(line=>ocrGear(line,slots)).length<3){
+      appendStatusLog('辨識中','補讀韓文名稱','info');
+      try {
+        const korean=await recognize(file,{language:'ko'});
+        const score=r=>new Set(r.items.map(line=>ocrGear(line,slots)?.id).filter(Boolean)).size;
+        if(score(korean)>score(result)){result=korean;language='ko';}
+      } catch(error) { console.warn('韓文補讀未完成，保留原結果',error); }
+    }
+    const reread=input=>recognize(input,{language});
+    const refined=await refineOCRLines(file,result.items,slots,reread);
     const data=assembleOCRItems(refined,slots);
     data.note=equipmentRestrictionNote(data.items,restrictions.items);
     if(!data.items.length)throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');
@@ -112,7 +121,7 @@ async function refineOCRLines(file,lines,slots,recognize) {
   return improved;
 }
 function assembleOCRItems(lines,slots) {
-  const slotNames={1:'主手',2:'副手',3:'頭部',4:'身體',5:'手部',6:'腰部',7:'腿部',8:'腳部',9:'耳飾',10:'項鍊',11:'手環',12:'戒指',13:'戒指'};
+  const slotNames={1:'主手',2:'副手',3:'頭部',4:'身體',5:'手部',6:'腰部',7:'腿部',8:'腳部',9:'耳飾',10:'項鍊',11:'手環',12:'戒指',13:'主手',14:'主手',15:'身體',16:'身體',18:'腿部',19:'身體',20:'身體',21:'身體',22:'身體',23:'身體'};
   const groups=[];
   for(const line of lines){
     const match=ocrGear(line,slots);if(!match||!slotNames[slots[match.id]])continue;

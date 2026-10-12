@@ -107,7 +107,7 @@ assert.equal(google(html),google(fs.readFileSync('old/FF14外觀AI辨識小工�
   assert.ok(run('cachedCustomDb.provenance.find(p=>p.repo===ITEM_REPO).fetchedAt'));
   assert.equal(run('cachedCustomDb.sources[1].length'),actualBefore.sources[1].length);
   context.calls=[];context.failSource=true;
-  run("cachedCustomDb.provenance=[];repositoryVersion=async repo=>({sha:repo,label:repo,date:'2026-10-04'});syncDatabasePart=async(repo,version)=>{calls.push(repo);if(repo===TEAMCRAFT_REPO && failSource)throw Error('download failed');const db=structuredClone(cachedCustomDb);db.provenance=db.provenance.filter(p=>p.repo!==repo);db.provenance.push({repo,commit:version.sha,label:version.label});db.ocrSupport ||= {commits:{}};db.ocrSupport.commits ||= {};db.ocrSupport.commits[repo]=version.sha;await saveDatabaseToIDB(db);return db}");
+  run("cachedCustomDb.provenance=[];repositoryVersion=async repo=>({sha:repo,label:repo,date:'2026-10-04'});syncDatabasePart=async(repo,version)=>{calls.push(repo);if(repo===TEAMCRAFT_REPO && failSource)throw Error('download failed');const db=structuredClone(cachedCustomDb);db.provenance=db.provenance.filter(p=>p.repo!==repo);db.provenance.push({repo,commit:version.sha,label:version.label});db.languages ||= {};db.languages.ko ||= {};db.ocrSupport ||= {commits:{}};db.ocrSupport.koreanDyes ||= {};db.ocrSupport.commits ||= {};db.ocrSupport.commits[repo]=version.sha;await saveDatabaseToIDB(db);return db}");
   await run('syncAllDatabases()');
   assert.equal(context.calls.length,3);
   assert.equal(run('cachedCustomDb.provenance.length'),2);

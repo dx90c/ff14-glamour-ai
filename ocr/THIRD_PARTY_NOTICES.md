@@ -7,3 +7,8 @@
 - clipper-lib：Boost Software License 1.0，https://github.com/junmer/clipper-lib
 
 授權全文另存於此目錄 LICENSE-* 檔案。PP-OCRv5 模型取自 PaddleOCR 官方模型資源，依 Apache-2.0 授權放在 models 資料夾，由本站提供；不內嵌於 HTML。來源網址、檔案大小及 SHA-256 見 models/manifest.json。
+
+
+## Korean recognition model (v2.5.0)
+
+korean_PP-OCRv5_mobile_rec ONNX model from the official PaddleOCR/PaddleX distribution, Apache-2.0. Official source URL, packaged filename and SHA-256 are recorded in models/manifest.json.

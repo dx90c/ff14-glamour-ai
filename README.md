@@ -2,7 +2,7 @@
 
 讀取**附有裝備名稱文字**的 FF14 穿搭圖片，將名稱比對至裝備資料庫，整理取得方式與圖片中的染色資訊，方便查找與保存。
 
-[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/archive/refs/heads/main.zip) · [下載 HTML](https://dx90c.github.io/ff14-glamour-ai/FF14%E5%A4%96%E8%A7%80AI%E8%BE%A8%E8%AD%98%E5%B0%8F%E5%B7%A5%E5%85%B7.html) · [下載裝備庫 JSON](https://dx90c.github.io/ff14-glamour-ai/ff14_database.json)
+[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/ff14_database_v2.5.0.json)
 
 ## 功能與限制
 
@@ -10,12 +10,12 @@
 - 比對裝備名稱，查詢來源庫收錄的取得方式，提供灰機 Wiki 與 Google 搜尋連結。
 - 讀取染劑名稱文字，並依文字位置配對裝備；不能僅憑衣服顏色判斷染劑。
 - 依已收錄資料顯示跨職業、種族與性別限制提醒。
-- 匯出含原圖的 XLSX，或下載 CSV、TXT。XLSX 保留裝備原名、取得方式、染色、疑似匹配與穿搭提醒，圖片放在 F 欄等比例縮放。
+- 匯出含原圖的 XLSX，或下載 CSV、PNG。XLSX 保留裝備原名、取得方式、染色、疑似匹配與穿搭提醒，圖片放在 F 欄等比例縮放。
 - 對部分未匹配、低信心或小字區域自動裁切放大重讀，維持原有名稱匹配門檻。雙語名稱與染劑可依位置合併；兩個明確色槽使用相同染劑時保留兩槽。
 
 **本工具沒有提供僅憑角色外觀辨認裝備的可靠功能。** 使用 OCR 或 AI API，都建議提供帶有清楚裝備名稱的圖片。
 
-名稱庫支援繁中、簡中、英文、日文、法文與德文。預設 PaddleOCR 模型主要支援中、英、日文；法文、德文尚未完整實測。韓文名稱目前未收錄。
+名稱庫支援繁中、簡中、英文、日文、法文、德文與韓文。預設 PaddleOCR 模型主要支援中、英、日文；法文、德文尚未完整實測。韓文圖片會在原模型匹配不足時自動嘗試韓文模型，依物品 ID 對照中文名稱與灰機連結；仍可能有漏讀或誤匹配。
 
 圖片小字、模糊文字、特殊排版可能造成錯字或漏讀。免費 OCR 模式目前只列出成功匹配的裝備，表格可能不完整。
 
@@ -41,18 +41,20 @@ XXXX 為佔位文字，不是實際辨識結果。
 
 ## 下載版與資料更新
 
-建議下載完整檔案並解壓縮，保留 `FF14外觀AI辨識小工具.html`、`ff14_database.json`、`ocr`、`xlsx` 與 `assets` 資料夾的相對位置。若只下載 HTML 與 JSON，含圖 XLSX 匯出還需要同層的 `xlsx` 資料夾。雙擊 HTML 開啟後，首次需在裝備庫視窗手動匯入 JSON。
+下載完整 ZIP 後，完整解壓並雙擊 `start.bat`。會自動開啟本機網頁，不需另裝 Node 或 Python。啟動視窗需保持開啟，關閉後服務停止。包內有中英文 README，檔名使用英文；解壓路徑可包含中文或空白。
 
-**免費 OCR 需要 HTTP(S) 網址，不能直接從 `file://` 執行。**一般使用者請使用線上版；下載版直接雙擊 HTML 可使用 AI API。若自行架設本機 HTTP 伺服器，也可使用免費 OCR。免安裝的本機啟動器尚未提供。
+完整包適用 Windows，需可執行內建 Windows PowerShell，建議 Chrome 或 Edge。服務僅監聽 `127.0.0.1`，預設埠 48731，被占用時自動選下一個可用埠。包內包含 OCR 引擎、中英日與韓文模型、JSON、XLSX 元件與示範圖，預設 OCR 可在不連外的情況使用。AI API、搜尋與資料同步仍需網路。
 
-OCR 引擎與兩個 PP-OCRv5 輕量模型均由本專案 GitHub Pages 提供。兩個模型合計約 21.5 MB，首次由瀏覽器取得並嘗試保存至模型快取；快取可用時會直接重用。清除網站資料、模型版本變更或瀏覽器無法保留快取時需重新取得，因此不保證完全離線。AI API、搜尋與資料同步需要網路。XLSX 在瀏覽器產生，不會因匯出而上傳圖片。
+**免費 OCR 需要 HTTP(S)，請用啟動器開啟。** 單獨下載 HTML 並雙擊開啟時，僅能使用 AI API；首次需手動匯入 JSON。含圖 XLSX 還需要同層的 `xlsx` 資料夾，因此建議使用完整 ZIP。
+
+線上版的模型由本專案 GitHub Pages 提供，中英日與韓文模型合計約 35 MB；首次由瀏覽器取得並嘗試快取，清除網站資料或模型版本變更時需重新載入。XLSX、CSV、PNG 都在瀏覽器產生，不會因匯出而上傳圖片。PNG 包含結果與完整原圖，保留署名及水印；PNG 無可點擊連結，可編輯資料請選 XLSX 或 CSV。
 
 XLSX 檔名為 `YYYYMMDD標題_HHmmss.xlsx`；沒有可用標題時使用身體裝備名稱，再依序使用第一件裝備名稱、FF14外觀筆記。日期與時間採使用者瀏覽器的本機時間。保留原圖中的署名與水印；匯出檔案不代表取得原作者的公開轉載授權。
 
 遊戲改版後按「一鍵同步庫」，名稱、取得方式、部位與穿搭限制會隨各自來源一起更新。已最新且索引完整的來源會略過下載；失敗時再次按同一按鈕即可重試，已完成的來源會保留。
 
 - **線上版**：資料保存在目前瀏覽器，關閉頁面後仍會保留；清除網站資料或更換瀏覽器後需重新載入。
-- **下載版**：資料也保存在目前瀏覽器。若要同步寫回資料夾中的 JSON，請使用支援資料夾寫入的瀏覽器（如 Chrome、Edge），首次選擇資料夾並授權即可。
+- **下載版**：資料也保存在目前瀏覽器。若要同步寫回資料夾中的 JSON，請使用支援資料夾寫入的瀏覽器（如 Chrome、Edge），首次同步時選擇完整包的資料夾並授權，即可自動寫回 ff14_database.json。瀏覽器資料依網址與連接埠分開保存；啟動埠變更時會重新載入包內 JSON。
 
 ## 隱私
 
@@ -65,7 +67,7 @@ API Key 儲存在本機瀏覽器。使用 AI API 時，圖片與驗證所需的 
 | 來源 | 用途 | 授權 |
 | --- | --- | --- |
 | [InfSein](https://github.com/InfSein/ffxiv-datamining-mixed) | 五語裝備名稱、裝備描述中明載的種族與性別條件 | 請參閱來源專案 |
-| [Teamcraft](https://github.com/ffxiv-teamcraft/ffxiv-teamcraft) | 繁中名稱、取得方式、部位與職業資料 | MIT |
+| [Teamcraft](https://github.com/ffxiv-teamcraft/ffxiv-teamcraft) | 繁中／韓文名稱、取得方式、部位與職業資料 | MIT |
 | [LuminaSupplemental](https://github.com/Critical-Impact/LuminaSupplemental) | 補充取得方式 | GPL-3.0 |
 | [OpenCC](https://github.com/BYVoid/OpenCC) | 簡繁字形輔助匹配 | Apache-2.0 |
 | [ExcelJS](https://github.com/exceljs/exceljs) | 含圖 XLSX 匯出 | MIT |

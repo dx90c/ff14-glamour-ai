@@ -13,6 +13,12 @@
       "bytes": 16701440,
       "sha256": "f7e792bc836f36e7ef895ad47c426d75b0b75b1650caa6d63fe9418441ffba8c",
       "source": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_onnx_infer.tar"
+    },
+    "korean_PP_OCRv5_mobile_rec": {
+      "file": "korean_PP-OCRv5_mobile_rec-568ed8b43a26.tar",
+      "sha256": "568ed8b43a260adc9f484d92105e425ea8cddf8ce16940c177bc12864cfb0eb0",
+      "bytes": 13537280,
+      "source": "https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/korean_PP-OCRv5_mobile_rec_onnx_infer.tar"
     }
   }
 }

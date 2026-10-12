@@ -34,7 +34,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 v2.4.4</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 v2.5.0</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -789,7 +789,7 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.4.4版</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.5.0版</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
@@ -816,11 +816,12 @@
     </div>
   </div>
 
+  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/ff14_database_v2.5.0.json" download>下載裝備庫 JSON</a></p>
   <!-- Upload Area -->
   <div class="upload-card" id="dropZone" onclick="triggerFileInput()">
     <div class="upload-icon">📸</div>
     <div class="upload-title">點擊或拖放外觀截圖至此處（支援剪貼簿 Ctrl+V 貼上）</div>
-    <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF<br>目前僅支援繁中、簡中、英文、日文、法文、德文</div>
+    <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF<br>目前僅支援繁中、簡中、英文、日文、法文、德文、韓文</div>
     <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
   </div>
 
@@ -852,7 +853,7 @@
       <div class="action-buttons">
         <button class="btn btn-primary" onclick="downloadXLSX(this)">💾 儲存 XLSX（含圖）</button>
         <button class="btn btn-primary" onclick="downloadCSV()">💾 下載 CSV 表格</button>
-        <button class="btn btn-secondary" onclick="downloadTXT()">📝 下載 TXT 筆記</button>
+        <button class="btn btn-secondary" onclick="downloadPNG(this)">🖼️ 儲存 PNG（含圖）</button>
       </div>
     </div>
 
@@ -910,7 +911,7 @@
 
       <!-- Manual Drag & Drop CSV Fallback -->
       <div class="drop-csv-zone" id="csvDropZone" onclick="document.getElementById('csvFileInput').click()">
-        📁 點擊或拖入資料庫 <code>.json</code>；亦可匯入單語 <code>Item.csv</code>（CSV 請在選檔前指定語言）<br><select id="csvLanguage" onclick="event.stopPropagation()"><option value="chs">簡中</option><option value="tc">繁中</option><option value="en">英文</option><option value="ja">日文</option><option value="fr">法文</option><option value="de">德文</option></select>
+        📁 點擊或拖入資料庫 <code>.json</code>；亦可匯入單語 <code>Item.csv</code>（CSV 請在選檔前指定語言）<br><select id="csvLanguage" onclick="event.stopPropagation()"><option value="chs">簡中</option><option value="tc">繁中</option><option value="en">英文</option><option value="ja">日文</option><option value="fr">法文</option><option value="de">德文</option><option value="ko">韓文</option></select>
         <input type="file" id="csvFileInput" accept=".csv,.json" style="display:none;" onchange="handleCsvFileSelect(event)">
       </div>
     </div>
@@ -1007,17 +1008,18 @@
 <!-- === [SECTION: HTML_DOM] END === -->
 
 <script>
+  const LOCAL_PACKAGE = true;
   let currentOutfitData = null;
   let currentImageBase64 = null;
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.4.4 版本設定
+  // 全域狀態與 v2.5.0 版本設定
   const BUILTIN_VERSION = {
-    version: "v2.4.4",
-    sha: "builtin-v2.4.4",
-    date: "2026-10-10",
-    label: "v2.4.4版"
+    version: "v2.5.0",
+    sha: "builtin-v2.5.0",
+    date: "2026-10-12",
+    label: "v2.5.0版"
   };
 
   // 1. 初始化
@@ -1193,12 +1195,28 @@
   }
 
   async function loadPrebuiltDatabaseIfEmpty() {
-    if (cachedCustomDb) return cachedCustomDb;
+    if (cachedCustomDb?.languages?.ko && cachedCustomDb?.ocrSupport?.koreanDyes) return cachedCustomDb;
     // file:// cannot reliably read neighbouring files. Use explicit import there.
     if (location.protocol === 'file:') return null;
     try {
       const resp = await fetch('./ff14_database.json', { signal: AbortSignal.timeout(60000) });
-      if (resp.ok) await saveDatabaseToIDB(await resp.json());
+      if (resp.ok) {
+        const bundled = validateDatabase(await resp.json());
+        if (!cachedCustomDb) await saveDatabaseToIDB(bundled);
+        else if (cachedCustomDb.schemaVersion === 2 && bundled.languages?.ko) {
+          const merged = structuredClone(cachedCustomDb);
+          for (const [id,record] of Object.entries(merged.records)) {
+            const korean = bundled.records[id]?.names.ko;
+            if (!korean) continue;
+            record.names.ko = korean;
+            const ids = merged.items[normalizeItemName(korean)] ||= [];
+            if (!ids.includes(id)) ids.push(id);
+          }
+          (merged.languages ||= {}).ko = bundled.languages.ko;
+          (merged.ocrSupport ||= {}).koreanDyes = bundled.ocrSupport.koreanDyes || {};
+          await saveDatabaseToIDB(merged);
+        }
+      }
     } catch (err) { console.info('請同步或匯入資料庫：', err.message); }
     return cachedCustomDb;
   }
@@ -1247,7 +1265,8 @@
   }
 
   function normalizeItemName(value) {
-    return String(value || '').normalize('NFKC').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+    const s = String(value || '').normalize('NFKC').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+    return /[\uac00-\ud7af\u1100-\u11ff]/.test(s) ? s.replace(/\s/g, '') : s;
   }
 
   // CSV records may contain quoted newlines and doubled quotes.
@@ -1391,7 +1410,7 @@
   // === [SECTION: JS_TEAMCRAFT_DATABASE] START ===
   const TEAMCRAFT_REPO = 'ffxiv-teamcraft/ffxiv-teamcraft';
   const TEAMCRAFT_FILES = {
-    items:'libs/data/src/lib/json/items.json', zhItems:'libs/data/src/lib/json/zh/zh-items.json',
+    koItems:'libs/data/src/lib/json/ko/ko-items.json', items:'libs/data/src/lib/json/items.json', zhItems:'libs/data/src/lib/json/zh/zh-items.json',
     equipment:'libs/data/src/lib/json/equipment.json', twItems:'libs/data/src/lib/json/tw/tw-items.json', equipSlots:'libs/data/src/lib/json/item-equip-slot-category.json',
     extracts:'libs/data/src/lib/extracts/extracts.json', instances:'libs/data/src/lib/json/instances.json',
     zhInstances:'libs/data/src/lib/json/zh/zh-instances.json', twInstances:'libs/data/src/lib/json/tw/tw-instances.json',
@@ -1497,7 +1516,7 @@
   }
 
   function buildTeamcraftDatabase(data, version, previous = null) {
-    for (const key of ['items','zhItems','twItems','equipSlots','extracts']) {
+    for (const key of ['items','zhItems','twItems','koItems','equipSlots','extracts']) {
       if (!data[key] || typeof data[key] !== 'object' || Array.isArray(data[key])) throw new Error('Teamcraft 缺少 ' + key);
     }
     if (!Object.keys(data.equipSlots).length || !Object.keys(data.extracts).length) throw new Error('Teamcraft 資料為空');
@@ -1515,11 +1534,13 @@
         ['en','ja','fr','de'].includes(lang) && typeof name === 'string' && name));
       if (data.zhItems[id]?.zh) names.chs = data.zhItems[id].zh;
       if (data.twItems[id]?.tw) names.tc = data.twItems[id].tw;
+      if (data.koItems[id]?.ko) names.ko = data.koItems[id].ko;
       if (!Object.keys(names).length) continue;
       const old = db.records[id];
       // Retain previous exact names as aliases; no prefix stripping or fuzzy matches.
       db.records[id] = {names:{...names,...old?.names}};
       if (names.tc) db.records[id].names.tc = names.tc;
+      if (names.ko) db.records[id].names.ko = names.ko;
       const canonical = new Set(Object.values(db.records[id].names));
       const aliases = [...new Set([...(old?.aliases || []),...Object.values(names),...Object.values(old?.names || {})])]
         .filter(n => typeof n === 'string' && n && !canonical.has(n));
@@ -1544,6 +1565,7 @@
     }
     db.ocrSupport.commits ||= {};
     if (data.equipment) db.ocrSupport.commits[TEAMCRAFT_REPO] = version.sha;
+    db.ocrSupport.koreanDyes = buildKoreanDyes(data.koItems,data.items);
     db.sources = buildTeamcraftSources(data,db.records);
     // Supplemental data is only a fallback for IDs without Teamcraft acquisition records.
     for (const [id,list] of Object.entries(previous?.sources || {})) {
@@ -1592,7 +1614,7 @@
   // === [SECTION: JS_UNIFIED_DATABASE_SYNC] START ===
   const DATABASE_REPOS = [
     {repo:ITEM_REPO,role:'主庫',name:'InfSein',usage:'五語裝備名稱'},
-    {repo:TEAMCRAFT_REPO,role:'來源庫',name:'Teamcraft',usage:'繁中名稱、取得方式'},
+    {repo:TEAMCRAFT_REPO,role:'來源庫',name:'Teamcraft',usage:'繁中／韓文名稱、取得方式'},
     {repo:SOURCE_REPO,role:'副庫',name:'LuminaSupplemental',usage:'補充取得方式'}
   ];
   let remoteDatabaseVersions = {};
@@ -1761,7 +1783,7 @@
           const version = await repositoryVersion(repo);
           remoteDatabaseVersions[repo] = version;
           const installed = getCustomDatabase()?.provenance?.find(p=>p.repo === repo);
-          if (installed?.commit === version.sha && (![ITEM_REPO,TEAMCRAFT_REPO].includes(repo) || getCustomDatabase()?.ocrSupport?.commits?.[repo] === version.sha)) {
+          if (installed?.commit === version.sha && (repo !== TEAMCRAFT_REPO || Boolean(getCustomDatabase()?.languages?.ko && getCustomDatabase()?.ocrSupport?.koreanDyes)) && (![ITEM_REPO,TEAMCRAFT_REPO].includes(repo) || getCustomDatabase()?.ocrSupport?.commits?.[repo] === version.sha)) {
             if (!installed.label || !installed.dataDate || (!installed.gameVersion && version.gameVersion)) {
               const db = structuredClone(getCustomDatabase());
               Object.assign(db.provenance.find(p=>p.repo === repo),{label:version.label,dataDate:version.date,gameVersion:version.gameVersion,gameVersionBasis:version.gameVersionBasis});
@@ -1810,7 +1832,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.4.4 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.5.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -1936,7 +1958,7 @@ async function callLocalOCR(file) {
     if(!getCustomDatabase()?.records)throw new Error('請先在裝備庫匯入或同步完整 JSON，再進行 OCR 辨識');
     document.getElementById('loadingMsg').textContent='準備文字辨識模型並辨識圖片…';
     appendStatusLog('免費 OCR','圖片在本機瀏覽器辨識；模型由本站取得，快取可用時直接重用','info');
-    if(location.protocol==='file:')throw new Error('免費 OCR 需要透過 HTTP(S) 網址開啟。請使用線上版；直接雙擊下載的 HTML 僅可使用 AI 模式。');
+    if(location.protocol==='file:')throw new Error('免費 OCR 請解壓完整 ZIP 後執行 start.bat，或使用線上版；直接雙擊 HTML 僅可使用 AI 模式。');
     await loadPaddleEngine();
     const {recognize}=window.FF14OCR;
     const db=getCustomDatabase();
@@ -1944,11 +1966,20 @@ async function callLocalOCR(file) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.4.4 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.5.0 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
-    const result=await recognize(file);
-    const refined=await refineOCRLines(file,result.items,slots,recognize);
+    let result=await recognize(file),language='default';
+    if(result.items.filter(line=>ocrGear(line,slots)).length<3){
+      appendStatusLog('辨識中','補讀韓文名稱','info');
+      try {
+        const korean=await recognize(file,{language:'ko'});
+        const score=r=>new Set(r.items.map(line=>ocrGear(line,slots)?.id).filter(Boolean)).size;
+        if(score(korean)>score(result)){result=korean;language='ko';}
+      } catch(error) { console.warn('韓文補讀未完成，保留原結果',error); }
+    }
+    const reread=input=>recognize(input,{language});
+    const refined=await refineOCRLines(file,result.items,slots,reread);
     const data=assembleOCRItems(refined,slots);
     data.note=equipmentRestrictionNote(data.items,restrictions.items);
     if(!data.items.length)throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');
@@ -2028,7 +2059,7 @@ async function refineOCRLines(file,lines,slots,recognize) {
   return improved;
 }
 function assembleOCRItems(lines,slots) {
-  const slotNames={1:'主手',2:'副手',3:'頭部',4:'身體',5:'手部',6:'腰部',7:'腿部',8:'腳部',9:'耳飾',10:'項鍊',11:'手環',12:'戒指',13:'戒指'};
+  const slotNames={1:'主手',2:'副手',3:'頭部',4:'身體',5:'手部',6:'腰部',7:'腿部',8:'腳部',9:'耳飾',10:'項鍊',11:'手環',12:'戒指',13:'主手',14:'主手',15:'身體',16:'身體',18:'腿部',19:'身體',20:'身體',21:'身體',22:'身體',23:'身體'};
   const groups=[];
   for(const line of lines){
     const match=ocrGear(line,slots);if(!match||!slotNames[slots[match.id]])continue;
@@ -2412,9 +2443,9 @@ function assembleOCRItems(lines,slots) {
     return Number.isFinite(cost)?{cost,edits:costs.indexOf(cost)}:null;
   }
   function oneCharacterDifference(a,b) { return weightedNameDistance(a,b,1)?.edits===1; }
-  function nameLanguage(name) { return /[\u3040-\u30ff]/.test(name)?'ja':/[\u3400-\u9fff]/.test(name)?'zh':'latin'; }
+  function nameLanguage(name) { return /[\uac00-\ud7af\u1100-\u11ff]/.test(name)?'ko':/[\u3040-\u30ff]/.test(name)?'ja':/[\u3400-\u9fff]/.test(name)?'zh':'latin'; }
   function protectedEquipmentWords(name) {
-    return (name.match(/治愈|治疗|咏唱|强袭|精准|御敌|制敌|游击|healing|casting|fending|aiming|striking|scouting|maiming|augmented/g)||[]).sort().join('|');
+    return (name.match(/治愈|治疗|咏唱|强袭|精准|御敌|制敌|游击|healing|casting|fending|aiming|striking|scouting|maiming|augmented|치유사|마술사|수호자|유격대|타격대|정찰대|학살자|보강된/g)||[]).sort().join('|');
   }
   let fuzzyDatabaseReference,fuzzyNameBuckets,fuzzyResultCache;
   function fuzzyEquipmentMatch(names,db) {
@@ -2627,9 +2658,32 @@ function assembleOCRItems(lines,slots) {
   }
   initOfficialDyeLookup();
 
+  function buildKoreanDyes(koItems, items) {
+    const dyes = {};
+    for (const [id, record] of Object.entries(koItems || {})) {
+      if (!record.ko?.startsWith('염료:')) continue;
+      const english = items[id]?.en?.replace(/ Dye$/i, '').replace(/^General-purpose /i, '');
+      const canonical = COMPACT_OFFICIAL_DYES.find(([zh,en]) => !zh.startsWith('特製') && en?.toLowerCase() === english?.toLowerCase())?.[0];
+      if (!canonical) continue;
+      dyes[normalizeItemName(record.ko)] = canonical;
+      dyes[normalizeItemName(record.ko.replace(/^염료:\s*/, ''))] = canonical;
+    }
+    return dyes;
+  }
   function lookupSingleOfficialDye(str) {
     if (!str) return null;
     const s = str.trim();
+    const korean = getCustomDatabase()?.ocrSupport?.koreanDyes?.[normalizeItemName(s)];
+    if (korean) return korean;
+    // Korean dye OCR: one edit only, and conflicting colours remain unresolved.
+    const key = normalizeItemName(s);
+    if (/^[\uac00-\ud7af]{4,}$/.test(key)) {
+      const candidates = new Set(Object.entries(getCustomDatabase()?.ocrSupport?.koreanDyes || {})
+        .filter(([name]) => /^[\uac00-\ud7af]+$/.test(name) && weightedNameDistance(key,name,1)?.cost <= 100)
+        .map(([,colour]) => colour));
+      if (candidates.size === 1) return [...candidates][0] + '（疑似染色；原辨識：' + s + '）';
+    }
+    if (['미염색','염색없음','없음'].includes(normalizeItemName(s))) return '未染色';
     if (DYE_LOOKUP_MAP.has(s)) return DYE_LOOKUP_MAP.get(s);
     if (DYE_LOOKUP_MAP.has(s.toLowerCase())) return DYE_LOOKUP_MAP.get(s.toLowerCase());
     return null;
@@ -2782,7 +2836,7 @@ function assembleOCRItems(lines,slots) {
     document.getElementById("resultSection").scrollIntoView({ behavior: 'smooth' });
   }
 
-  // 5. 匯出功能（含圖 XLSX、下載 CSV、下載 TXT）
+  // 5. 匯出功能（含圖 XLSX、下載 CSV、儲存 PNG）
 // === [SECTION: JS_XLSX_EXPORT] START ===
 // Shared by the browser and local export checks. ExcelJS is loaded only on export.
 function outfitFileName(title, bodyName, date = new Date()) {
@@ -2925,35 +2979,84 @@ async function downloadXLSX(button) {
     downloadBlob(blob, filename);
   }
 
-  function downloadTXT() {
-    if (!currentOutfitData) return;
-
-    let lines = [];
-    lines.push(`【${currentOutfitData.outfit_title || "FF14 外觀穿搭"}】`);
-    lines.push("=".repeat(50));
-    (currentOutfitData.items || []).forEach(it => {
-      const wikiInfo = getHuijiWikiUrl(it);
-      const isCardNonChinese = /[\u3040-\u30ff]/.test(it.name_zh || "") || /^[A-Za-z0-9\s'._-]+$/.test(it.name_zh || "");
-      const gearName = matchedEquipmentExportName(it, (it.resolved_name && isCardNonChinese) ? it.resolved_name : (it.resolved_name || it.name_zh));
-      const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
-      const sourceInfo = resolveEquipmentSource(it);
-      const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
-      lines.push(`• [${it.slot}] ${gearName}`);
-      if (subName) lines.push(`  原名：${subName}`);
-      lines.push(`  來源：${finalSource}`);
-      lines.push(`  染色：${translateDyeSetting(it.dye || it.dye_setting || "")}`);
-      lines.push(`  灰機：${wikiInfo.url}`);
-      lines.push("");
-    });
-    if (currentOutfitData.note) {
-      lines.push("-".repeat(50));
-      lines.push(`💡 穿搭提醒：${currentOutfitData.note}`);
+// === [SECTION: JS_PNG_EXPORT] START ===
+async function downloadPNG(button) {
+  if (!currentOutfitData?.items?.length) return;
+  const oldLabel = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = '正在儲存…'; }
+  try {
+    const preview = document.getElementById('previewImg');
+    if (!preview?.naturalWidth) throw new Error('原圖尚未載入，請稍後再試');
+    const body = currentOutfitData.items.find(it => /^(身體|身|身體部位)$/.test(it.slot)) || currentOutfitData.items[0];
+    const bodyName = matchEquipment(body)?.names.tc || body.resolved_name || body.name_zh;
+    const generic = /^(?:免費\s*OCR.*|FF14\s*外觀.*|未命名.*)$/i.test(currentOutfitData.outfit_title || '');
+    const title = generic ? bodyName : currentOutfitData.outfit_title || bodyName;
+    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+    const font = '"Microsoft JhengHei", "Malgun Gothic", Arial, sans-serif';
+    const widths = [80,285,355,180], left = 28, lineHeight = 23;
+    function wrap(text, width, style) {
+      ctx.font = style;
+      const lines = [];
+      for (const paragraph of String(text || '').split(/\r?\n/)) {
+        let line = '';
+        for (const char of paragraph) {
+          if (line && ctx.measureText(line + char).width > width) { lines.push(line); line = ''; }
+          line += char;
+        }
+        lines.push(line);
+      }
+      return lines;
     }
+    const regular = '16px ' + font, bold = 'bold 17px ' + font;
+    const rows = currentOutfitData.items.map(it => {
+      const match = matchEquipment(it), source = resolveEquipmentSource(it);
+      const original = [it.name_en_jp, it.name_zh].filter(n => n && !['無','None'].includes(n) && n !== match?.names.tc);
+      const name = matchedEquipmentExportName(it, it.resolved_name || it.name_zh);
+      const cells = [
+        [{text:it.slot,style:regular,colour:'#287ab0'}],
+        [{text:name,style:bold,colour:'#203449'}, ...(original.length ? [{text:[...new Set(original)].join(' / '),style:'14px '+font,colour:'#65778a'}] : [])],
+        [{text:source.sourceText,style:regular,colour:'#00846a'}],
+        [{text:translateDyeSetting(it.dye || it.dye_setting || ''),style:regular,colour:'#9e392f'}]
+      ];
+      const wrapped = cells.map((cell,i) => cell.flatMap(block => wrap(block.text,widths[i]-24,block.style).map(text=>({...block,text}))));
+      return {cells:wrapped,height:Math.max(76,...wrapped.map(cell=>cell.length*lineHeight+28))};
+    });
+    const tableHeight = 44 + rows.reduce((sum,row)=>sum+row.height,0);
+    const notes = currentOutfitData.note ? wrap('穿搭提醒：'+currentOutfitData.note,1220,regular) : [];
+    const titleLines = wrap(title,1200,'bold 26px '+font);
+    const headerHeight = Math.max(100,titleLines.length*34+54);
+    const tableTop = headerHeight + 28;
+    const height = tableTop + tableHeight + (notes.length ? notes.length*lineHeight+46 : 0) + 72;
+    const scale = Math.min(2,16384/Math.max(1320,height));
+    canvas.width = Math.ceil(1320*scale); canvas.height = Math.ceil(height*scale); ctx.scale(scale,scale);
+    ctx.fillStyle = '#f3f6fa'; ctx.fillRect(0,0,1320,height);
+    ctx.fillStyle = '#203449'; ctx.fillRect(0,0,1320,headerHeight);
+    ctx.textBaseline = 'top'; ctx.font = 'bold 26px '+font; ctx.fillStyle = '#ffffff';
+    titleLines.forEach((line,i)=>ctx.fillText(line,28,22+i*34));
+    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · v2.5.0',28,headerHeight-32);
+    ctx.fillStyle = '#dfe8f0'; ctx.fillRect(left,tableTop,900,44);ctx.font=bold;ctx.fillStyle='#203449';
+    let x=left;['部位','繁中裝備名稱／原名','取得方式','染色設定'].forEach((name,i)=>{ctx.fillText(name,x+12,tableTop+12);x+=widths[i];});
+    let y=tableTop+44;
+    rows.forEach((row,index)=>{
+      ctx.fillStyle=index%2?'#f8fafc':'#ffffff';ctx.fillRect(left,y,900,row.height);x=left;
+      row.cells.forEach((cell,i)=>{cell.forEach((line,n)=>{ctx.font=line.style;ctx.fillStyle=line.colour;ctx.fillText(line.text,x+12,y+14+n*lineHeight);});x+=widths[i];});
+      ctx.strokeStyle='#d4dce5';ctx.strokeRect(left,y,900,row.height);y+=row.height;
+    });
+    const photoX=952, photoWidth=340;
+    ctx.fillStyle='#ffffff';ctx.fillRect(photoX,tableTop,photoWidth,tableHeight);
+    const ratio=Math.min((photoWidth-20)/preview.naturalWidth,(tableHeight-20)/preview.naturalHeight);
+    const w=preview.naturalWidth*ratio,h=preview.naturalHeight*ratio;
+    ctx.drawImage(preview,photoX+(photoWidth-w)/2,tableTop+10,w,h);
+    if(notes.length){ctx.fillStyle='#fff7df';ctx.fillRect(28,y+18,1264,notes.length*lineHeight+24);ctx.font=regular;ctx.fillStyle='#795b20';notes.forEach((line,i)=>ctx.fillText(line,40,y+30+i*lineHeight));}
+    ctx.font='14px '+font;ctx.fillStyle='#65778a';ctx.fillText('原圖保留署名與水印；疑似匹配與染色請核對。',28,height-35);
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('無法產生 PNG 圖片')),'image/png'));
+    downloadBlob(blob,outfitFileName(currentOutfitData.outfit_title,bodyName).replace(/\.xlsx$/,'.png'));
+    showToast('已儲存含原圖的 PNG');
+  } catch(error) { alert('PNG 儲存失敗：'+error.message); }
+  finally { if(button){button.disabled=false;button.textContent=oldLabel;} }
+}
+// === [SECTION: JS_PNG_EXPORT] END ===
 
-    const blob = new Blob([lines.join("\r\n")], { type: "text/plain;charset=utf-8;" });
-    const filename = `${sanitizeFilename(currentOutfitData.outfit_title || "FF14外觀")}.txt`;
-    downloadBlob(blob, filename);
-  }
 
   function escapeCsv(val) {
     if (val == null) return '""';
