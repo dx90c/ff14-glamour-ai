@@ -11,7 +11,7 @@
       document.head.append(script);
     });return paddleEngineLoading;
   }
-async function callLocalOCR(file) {
+async function callLocalOCR(file, options = {}) {
   const loading=document.getElementById('loadingBox');
   loading.style.display='block';document.getElementById('resultSection').style.display='none';
   document.getElementById('statusLogList').innerHTML='';
@@ -28,7 +28,7 @@ async function callLocalOCR(file) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.5.0 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.0 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
     let result=await recognize(file),language='default';
@@ -44,9 +44,10 @@ async function callLocalOCR(file) {
     const refined=await refineOCRLines(file,result.items,slots,reread);
     const data=assembleOCRItems(refined,slots);
     data.note=equipmentRestrictionNote(data.items,restrictions.items);
-    if(!data.items.length)throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');
-    renderResult(data);currentOutfitData=data;
+    if(!data.items.length){if(options.quiet)return null;throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');}
+    if(!options.quiet){renderResult(data);currentOutfitData=data;}
     appendStatusLog('完成',`辨識 ${result.items.length} 行，裝備 ${data.items.length} 件；信心分數不等於正確率`,'info');
+    return data;
   } finally {loading.style.display='none';}
 }
 function equipmentRestrictionNote(items,restrictions) {

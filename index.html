@@ -34,7 +34,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 v2.5.0</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 V2.6.0</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -779,6 +779,17 @@
       transform: translateX(-50%) translateY(0);
     }
       /* === [SECTION: CSS_STYLES] END === */
+    .import-card {background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:24px;}
+    .post-input-row {display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+    .post-input-row input {flex:1 1 260px;min-width:0;padding:12px;border:1px solid var(--border);border-radius:7px;font:inherit;}
+    .post-input-row button {flex-shrink:0;}
+    .post-import-hint {font-size:0.85rem;color:var(--text-muted);margin:10px 0 0;}
+    #postStatus:not(:empty) {margin-top:10px;overflow-wrap:anywhere;}
+    .import-divider {display:flex;align-items:center;gap:14px;color:var(--text-muted);margin:20px 0 0;}
+    .import-divider::before,.import-divider::after {content:'';height:1px;background:var(--border);flex:1;}
+    .import-card .upload-card {border:0;padding:22px 12px;margin:0;}
+    .import-card .upload-icon {font-size:2.6rem;margin-bottom:12px;}
+    @media(max-width:600px) {.import-card {padding:16px;} .post-input-row button {width:100%;}}
   </style>
 </head>
 <body>
@@ -789,7 +800,7 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">v2.5.0版</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">V2.6.0</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
@@ -816,14 +827,24 @@
     </div>
   </div>
 
-  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/ff14_database_v2.5.0.json" download>下載裝備庫 JSON</a></p>
+  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/ff14_database_v2.6.0.json" download>下載裝備庫 JSON</a></p>
+  <section class="import-card" aria-label="加入穿搭圖片">
+  <form class="post-import" onsubmit="event.preventDefault();recognizePost()">
+    <label for="postUrl" style="font-weight:bold">貼上 X 貼文網址</label>
+    <div class="post-input-row"><input id="postUrl" type="url" required placeholder="https://x.com/作者/status/貼文編號"><button id="postReadButton" class="btn btn-primary" type="submit">讀取整篇圖片</button></div>
+    <p class="post-import-hint">自動讀取貼文全部圖片，以本機 OCR 辨識。取圖服務：FxEmbed。</p>
+    <div id="postStatus" role="status"></div>
+  </form>
+  <div class="import-divider" aria-hidden="true"><span>或</span></div>
   <!-- Upload Area -->
   <div class="upload-card" id="dropZone" onclick="triggerFileInput()">
     <div class="upload-icon">📸</div>
-    <div class="upload-title">點擊或拖放外觀截圖至此處（支援剪貼簿 Ctrl+V 貼上）</div>
+    <div class="upload-title">點擊或拖放外觀截圖，也可 Ctrl+V 貼上</div>
     <div class="upload-hint">支援 PNG, JPG, JPEG, WEBP, JFIF<br>目前僅支援繁中、簡中、英文、日文、法文、德文、韓文</div>
     <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
   </div>
+
+  </section>
 
   <!-- Loading -->
   <div class="loading-overlay" id="loadingBox">
@@ -857,6 +878,7 @@
       </div>
     </div>
 
+    <div id="postChoices" style="margin-bottom:14px"></div>
     <div class="result-grid">
       <!-- Left: Table -->
       <div class="table-wrapper">
@@ -879,8 +901,9 @@
       </div>
 
       <!-- Right: Image Preview -->
-      <div class="image-preview-card">
-        <img id="previewImg" src="" alt="預覽圖">
+      <div class="image-preview-column" style="min-width:0">
+        <div class="image-preview-card"><img id="previewImg" src="" alt="預覽圖"></div>
+        <p id="postSource" style="margin:12px 8px 0;text-align:center;overflow-wrap:anywhere" hidden></p>
       </div>
     </div>
   </div>
@@ -1014,12 +1037,12 @@
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.5.0 版本設定
+  // 全域狀態與 v2.6.0 版本設定
   const BUILTIN_VERSION = {
-    version: "v2.5.0",
-    sha: "builtin-v2.5.0",
-    date: "2026-10-12",
-    label: "v2.5.0版"
+    version: "V2.6.0",
+    sha: "builtin-v2.6.0",
+    date: "2026-10-21",
+    label: "V2.6.0"
   };
 
   // 1. 初始化
@@ -1834,7 +1857,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.5.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.6.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -1951,7 +1974,7 @@
       document.head.append(script);
     });return paddleEngineLoading;
   }
-async function callLocalOCR(file) {
+async function callLocalOCR(file, options = {}) {
   const loading=document.getElementById('loadingBox');
   loading.style.display='block';document.getElementById('resultSection').style.display='none';
   document.getElementById('statusLogList').innerHTML='';
@@ -1968,7 +1991,7 @@ async function callLocalOCR(file) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.5.0 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.0 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
     let result=await recognize(file),language='default';
@@ -1984,9 +2007,10 @@ async function callLocalOCR(file) {
     const refined=await refineOCRLines(file,result.items,slots,reread);
     const data=assembleOCRItems(refined,slots);
     data.note=equipmentRestrictionNote(data.items,restrictions.items);
-    if(!data.items.length)throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');
-    renderResult(data);currentOutfitData=data;
+    if(!data.items.length){if(options.quiet)return null;throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');}
+    if(!options.quiet){renderResult(data);currentOutfitData=data;}
     appendStatusLog('完成',`辨識 ${result.items.length} 行，裝備 ${data.items.length} 件；信心分數不等於正確率`,'info');
+    return data;
   } finally {loading.style.display='none';}
 }
 function equipmentRestrictionNote(items,restrictions) {
@@ -2751,6 +2775,10 @@ function assembleOCRItems(lines,slots) {
       if (!item || typeof item !== 'object') throw new Error('AI 裝備資料格式錯誤');
       return Object.fromEntries(['slot','name_zh','name_huiji','name_en_jp','source','dye','dye_setting'].map(k => [k, typeof item[k] === 'string' ? item[k] : '']));
     });
+    const sourceElement=document.getElementById('postSource');sourceElement.replaceChildren();
+    sourceElement.hidden=!data.source_url;
+    if(data.source_url){const post=parsePostUrl(data.source_url);const a=document.createElement('a');a.href=post.url;a.textContent=data.source_author || '@'+post.handle;a.style.fontWeight='600';a.target='_blank';a.rel='noopener noreferrer';sourceElement.append('圖片來源：',a);}
+    if(!data.source_url){postResults=[];postPhotos=[];document.getElementById('postChoices').replaceChildren();}
     document.getElementById("outfitTitle").innerText = data.outfit_title || "【套裝】外觀穿搭";
 
     const tbody = document.getElementById("itemsTableBody");
@@ -2894,6 +2922,7 @@ async function buildOutfitXlsx(ExcelJS, data) {
     if (/^https?:\/\//.test(row.google||'')) sheet.getCell(n,3).value={text:row.original||'Google 搜尋',hyperlink:row.google};
   });
   let last=data.rows.length+4;
+  if(data.source_url){++last;sheet.mergeCells('A'+last+':E'+last);const c=sheet.getCell(last,1);c.value={text:'圖片來源：'+(data.source_author || data.source_url),hyperlink:data.source_url};c.font={name:'Microsoft JhengHei',size:10,color:{argb:'FF287AB0'}};c.alignment={wrapText:true};sheet.getRow(last).height=32;}
   if(data.note){
     ++last;sheet.mergeCells(`A${last}:E${last}`);
     const cell=sheet.getCell(last,1);cell.value='穿搭提醒：'+data.note;
@@ -2946,7 +2975,7 @@ async function downloadXLSX(button) {
     const title=currentOutfitData.outfit_title;
     const generic=/^(?:免費\s*OCR.*|FF14\s*外觀.*|未命名.*)$/i.test(title||'');
     const workbook=await buildOutfitXlsx(window.ExcelJS,{title:generic?bodyName:title,bodyName,rows,note:currentOutfitData.note,
-      image:{dataUrl:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height}});
+      source_url:currentOutfitData.source_url,source_author:currentOutfitData.source_author,image:{dataUrl:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height}});
     downloadBlob(new Blob([await workbook.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),outfitFileName(title,bodyName));
     showToast('已儲存含圖片的 XLSX');
   }catch(error){alert('XLSX 儲存失敗：'+error.message);}
@@ -2958,7 +2987,7 @@ async function downloadXLSX(button) {
     if (!currentOutfitData) return;
 
     let csvRows = [];
-    csvRows.push(["部位", "繁中裝備名稱", "外語原名（英／日／法／德）", "取得方式", "染色設定", "灰機wiki網址"].map(escapeCsv).join(","));
+    csvRows.push(["部位", "繁中裝備名稱", "外語原名", "取得方式", "染色設定", "灰機wiki網址", "圖片來源作者", "圖片來源網址"].map(escapeCsv).join(","));
 
     (currentOutfitData.items || []).forEach(it => {
       const wikiInfo = getHuijiWikiUrl(it);
@@ -2967,17 +2996,20 @@ async function downloadXLSX(button) {
       const subName = it.name_en_jp || (it.resolved_name !== it.name_zh ? it.name_zh : "");
       const sourceInfo = resolveEquipmentSource(it);
       const finalSource = sourceInfo.isVerified ? sourceInfo.sourceText : `${sourceInfo.sourceText}（未收錄，請查灰機）`;
-      csvRows.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url].map(escapeCsv).join(","));
+      csvRows.push([it.slot, gearName, subName, finalSource, translateDyeSetting(it.dye || it.dye_setting || ""), wikiInfo.url, postSourceAuthor(currentOutfitData), currentOutfitData.source_url || ""].map(escapeCsv).join(","));
     });
 
     if (currentOutfitData.note) {
-      csvRows.push([`備註：${currentOutfitData.note}`, "", "", "", "", ""].map(escapeCsv).join(","));
+      csvRows.push([`備註：${currentOutfitData.note}`, "", "", "", "", "", "", ""].map(escapeCsv).join(","));
     }
 
     // 加入 UTF-8 BOM (\uFEFF)，保證 Windows Excel 打開絕對不亂碼！
     const csvString = "\uFEFF" + csvRows.join("\r\n");
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
-    const filename = `${sanitizeFilename(currentOutfitData.outfit_title || "FF14外觀")}.csv`;
+    const body=currentOutfitData.items.find(it=>/^(身體|身|身體部位)$/.test(it.slot));
+    const first=currentOutfitData.items[0];
+    const bodyName=body?(matchEquipment(body)?.names.tc||body.resolved_name||body.name_zh):first?matchedEquipmentExportName(first,first.resolved_name||first.name_zh):'';
+    const filename=outfitFileName(currentOutfitData.outfit_title,bodyName).replace(/\.xlsx$/,'.csv');
     downloadBlob(blob, filename);
   }
 
@@ -3023,19 +3055,26 @@ async function downloadPNG(button) {
       const wrapped = cells.map((cell,i) => cell.flatMap(block => wrap(block.text,widths[i]-24,block.style).map(text=>({...block,text}))));
       return {cells:wrapped,height:Math.max(76,...wrapped.map(cell=>cell.length*lineHeight+28))};
     });
+    const photoX=952, photoWidth=340;
+    const sourceLines=currentOutfitData.source_url ? [
+      ...wrap('圖片來源：'+postSourceAuthor(currentOutfitData),photoWidth-24,bold),
+      ...wrap(currentOutfitData.source_url,photoWidth-24,'14px '+font)
+    ] : [];
+    const captionHeight=sourceLines.length ? sourceLines.length*23+20 : 0;
     const tableHeight = 44 + rows.reduce((sum,row)=>sum+row.height,0);
     const notes = currentOutfitData.note ? wrap('穿搭提醒：'+currentOutfitData.note,1220,regular) : [];
     const titleLines = wrap(title,1200,'bold 26px '+font);
     const headerHeight = Math.max(100,titleLines.length*34+54);
     const tableTop = headerHeight + 28;
-    const height = tableTop + tableHeight + (notes.length ? notes.length*lineHeight+46 : 0) + 72;
+    const photoHeight=Math.max(tableHeight,captionHeight+180);
+    const height = tableTop + photoHeight + (notes.length ? notes.length*lineHeight+46 : 0) + 72;
     const scale = Math.min(2,16384/Math.max(1320,height));
     canvas.width = Math.ceil(1320*scale); canvas.height = Math.ceil(height*scale); ctx.scale(scale,scale);
     ctx.fillStyle = '#f3f6fa'; ctx.fillRect(0,0,1320,height);
     ctx.fillStyle = '#203449'; ctx.fillRect(0,0,1320,headerHeight);
     ctx.textBaseline = 'top'; ctx.font = 'bold 26px '+font; ctx.fillStyle = '#ffffff';
     titleLines.forEach((line,i)=>ctx.fillText(line,28,22+i*34));
-    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · v2.5.0',28,headerHeight-32);
+    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · V2.6.0',28,headerHeight-32);
     ctx.fillStyle = '#dfe8f0'; ctx.fillRect(left,tableTop,900,44);ctx.font=bold;ctx.fillStyle='#203449';
     let x=left;['部位','繁中裝備名稱／原名','取得方式','染色設定'].forEach((name,i)=>{ctx.fillText(name,x+12,tableTop+12);x+=widths[i];});
     let y=tableTop+44;
@@ -3044,11 +3083,12 @@ async function downloadPNG(button) {
       row.cells.forEach((cell,i)=>{cell.forEach((line,n)=>{ctx.font=line.style;ctx.fillStyle=line.colour;ctx.fillText(line.text,x+12,y+14+n*lineHeight);});x+=widths[i];});
       ctx.strokeStyle='#d4dce5';ctx.strokeRect(left,y,900,row.height);y+=row.height;
     });
-    const photoX=952, photoWidth=340;
-    ctx.fillStyle='#ffffff';ctx.fillRect(photoX,tableTop,photoWidth,tableHeight);
-    const ratio=Math.min((photoWidth-20)/preview.naturalWidth,(tableHeight-20)/preview.naturalHeight);
+    ctx.fillStyle='#ffffff';ctx.fillRect(photoX,tableTop,photoWidth,photoHeight);
+    const ratio=Math.min((photoWidth-20)/preview.naturalWidth,(photoHeight-20-captionHeight)/preview.naturalHeight);
     const w=preview.naturalWidth*ratio,h=preview.naturalHeight*ratio;
     ctx.drawImage(preview,photoX+(photoWidth-w)/2,tableTop+10,w,h);
+    if(sourceLines.length){ctx.textAlign='center';ctx.fillStyle='#287ab0';sourceLines.forEach((line,i)=>{ctx.font=i===0?bold:'14px '+font;ctx.fillText(line,photoX+photoWidth/2,tableTop+22+h+i*23);});ctx.textAlign='left';}
+    y=Math.max(y,tableTop+photoHeight);
     if(notes.length){ctx.fillStyle='#fff7df';ctx.fillRect(28,y+18,1264,notes.length*lineHeight+24);ctx.font=regular;ctx.fillStyle='#795b20';notes.forEach((line,i)=>ctx.fillText(line,40,y+30+i*lineHeight));}
     ctx.font='14px '+font;ctx.fillStyle='#65778a';ctx.fillText('原圖保留署名與水印；疑似匹配與染色請核對。',28,height-35);
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('無法產生 PNG 圖片')),'image/png'));
@@ -3093,6 +3133,103 @@ async function downloadPNG(button) {
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
   // === [SECTION: JS_UI_RENDER_EXPORT] END ===
+// === [SECTION: JS_POST_IMAGES] START ===
+let postResults = [], postPhotos = [];
+function postSourceAuthor(data) {
+  return data.source_url ? data.source_author || '@'+parsePostUrl(data.source_url).handle : '';
+}
+function parsePostUrl(value) {
+  let url;
+  try { url = new URL(value.trim()); } catch { throw new Error('請貼上完整的 X／Twitter 貼文網址'); }
+  const match = url.pathname.match(/^\/([A-Za-z0-9_]{1,15})\/status\/(\d{1,25})(?:\/photo\/\d+)?\/?$/);
+  if (url.protocol !== 'https:' || url.port || url.username || url.password || !['x.com','www.x.com','twitter.com','www.twitter.com','mobile.twitter.com'].includes(url.hostname) || !match) throw new Error('請使用 x.com 或 twitter.com 的貼文網址');
+  return {id:match[2],handle:match[1],url:`https://x.com/${match[1]}/status/${match[2]}${url.search}`};
+}
+function postImageUrls(payload) {
+  const status = payload.status || payload.tweet;
+  if (!status) throw new Error('無法讀取貼文，可能已刪除、不公開或取圖服務暫時無法使用');
+  const photos = status.media?.photos || status.media?.all?.filter(p=>p.type === 'photo') || [];
+  if (!Array.isArray(photos)) throw new Error('取圖服務回傳的圖片清單格式不正確');
+  return [...new Set(photos.map(photo=>{
+    const url = new URL(photo.url);
+    if (url.protocol !== 'https:' || url.hostname !== 'pbs.twimg.com' || url.port || url.username || url.password || !url.pathname.startsWith('/media/')) throw new Error('取圖服務回傳非預期的圖片網址');
+    return url.href;
+  }))];
+}
+async function postFetch(url, image=false) {
+  const response = await fetch(url,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(45000)});
+  if (!response.ok) throw new Error(`取圖連線失敗（HTTP ${response.status}），請稍後重試或改貼圖片`);
+  const limit = image ? 20*1024*1024 : 2*1024*1024;
+  if (Number(response.headers.get('content-length')) > limit) throw new Error('圖片或貼文資料過大，請改貼單張圖片');
+  const blob = await response.blob();
+  if (blob.size > limit) throw new Error('圖片或貼文資料過大，請改貼單張圖片');
+  if (image && !blob.type.startsWith('image/')) throw new Error('圖片下載失敗：回傳的資料不是圖片');
+  return image ? blob : JSON.parse(await blob.text());
+}
+function setPostPreview(photo) {
+  document.getElementById('previewImg').src = photo.dataUrl;
+  currentImageBase64 = photo.dataUrl.split(',')[1]; currentImageMime = photo.file.type;
+}
+function showPostResult(index) {
+  const result = postResults[index]; if (!result) return;
+  currentOutfitData = result.data; setPostPreview(result.photo); renderResult(result.data);
+}
+function renderPostChoices() {
+  const choices = document.getElementById('postChoices'); choices.replaceChildren();
+  if (postResults.length > 1) postResults.forEach((result,index)=>{
+    const button = document.createElement('button');button.className='btn btn-secondary';
+    button.textContent=`成果 ${index+1}（${result.data.items.length} 件）`;button.onclick=()=>showPostResult(index);choices.append(button);
+  });
+  if (postPhotos.length > 1) {
+    const gallery=document.createElement('div');gallery.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';
+    for(const photo of postPhotos){
+      const button=document.createElement('button');button.type='button';button.title='使用此圖作為預覽及匯出圖片';button.style.cssText='padding:3px;border:1px solid #cad4de;border-radius:6px;background:white;cursor:pointer';
+      const image=document.createElement('img');image.src=photo.dataUrl;image.alt=`貼文圖片 ${photo.number}`;image.style.cssText='width:60px;height:76px;object-fit:contain';button.append(image);button.onclick=()=>setPostPreview(photo);gallery.append(button);
+    }
+    choices.append(gallery);
+  }
+}
+async function recognizePost() {
+  if (imageRequestBusy) { showToast('正在辨識，請稍候'); return; }
+  const button=document.getElementById('postReadButton'), status=document.getElementById('postStatus');
+  const previous={data:currentOutfitData,src:document.getElementById('previewImg').src,base64:currentImageBase64,mime:currentImageMime};
+  const photos=[],results=[],errors=[];let skipped=0;
+  imageRequestBusy=true;button.disabled=true;
+  try {
+    const post=parsePostUrl(document.getElementById('postUrl').value);
+    status.textContent='取得貼文圖片…';
+    const payload=await postFetch(`https://api.fxtwitter.com/2/status/${post.id}`);
+    const author=(payload.status || payload.tweet)?.author;
+    const authorName=typeof author?.name==='string' && author.name.trim() || '@'+post.handle;
+    const urls=postImageUrls(payload);
+    if(!urls.length)throw new Error('這篇貼文沒有可讀取的圖片');
+    for(let index=0;index<urls.length;index++){
+      status.textContent=`辨識貼文圖片 ${index+1}／${urls.length}…`;
+      let blob;
+      try{blob=await postFetch(urls[index],true);}catch(error){errors.push(`第 ${index+1} 張：${error.message}`);continue;}
+      const file=new File([blob],`post-${post.id}-${index+1}.jpg`,{type:blob.type});
+      const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('圖片讀取失敗'));r.readAsDataURL(file);});
+      const photo={number:index+1,file,dataUrl};photos.push(photo);
+      let data;
+      try{data=await callLocalOCR(file,{quiet:true});}catch(error){errors.push('OCR 未完成：'+error.message);break;}
+      if(!data){skipped++;continue;}
+      data.source_url=post.url;data.source_author=authorName;results.push({data,photo});
+    }
+    if(results.length){
+      postResults=results;postPhotos=photos;renderPostChoices();
+      showPostResult(results.reduce((best,r,i)=>r.data.items.length>results[best].data.items.length?i:best,0));
+      status.textContent=`完成：${results.length} 張產生成果${skipped?`，${skipped} 張未匹配到裝備已略過`:''}。${errors.length?'部分圖片未完成：'+errors.join('；'):''}`;
+    }else{
+      if(previous.data){currentOutfitData=previous.data;currentImageBase64=previous.base64;currentImageMime=previous.mime;document.getElementById('previewImg').src=previous.src;renderResult(previous.data);}
+      status.textContent=errors.length?errors.join('；'):'整篇未找到可辨識的裝備名稱，請改貼清楚的圖片。';
+    }
+  } catch(error){
+    if(previous.data){currentOutfitData=previous.data;renderResult(previous.data);}
+    status.textContent=error.message;
+  } finally { imageRequestBusy=false;button.disabled=false; }
+}
+// === [SECTION: JS_POST_IMAGES] END ===
+
 </script>
 
 </body>

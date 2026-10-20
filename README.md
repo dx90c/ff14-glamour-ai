@@ -2,14 +2,16 @@
 
 讀取**附有裝備名稱文字**的 FF14 穿搭圖片，將名稱比對至裝備資料庫，整理取得方式與圖片中的染色資訊，方便查找與保存。
 
-[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/FF14-Glamour-v2.5.0.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.5.0/ff14_database_v2.5.0.json)
+[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/ff14_database_v2.6.0.json)
 
 ## 功能與限制
 
-- 貼上、拖入或選擇圖片，將辨識結果整理成裝備表格。
+- 在同一張輸入卡片貼上 X／Twitter 貼文網址，或選擇、拖放、貼上截圖。
+- 網址模式取得貼文的全部圖片，逐張使用本機 OCR；無裝備匹配的圖片略過，多張成果可切換查看。
 - 比對裝備名稱，查詢來源庫收錄的取得方式，提供灰機 Wiki 與 Google 搜尋連結。
 - 讀取染劑名稱文字，並依文字位置配對裝備；不能僅憑衣服顏色判斷染劑。
 - 依已收錄資料顯示跨職業、種族與性別限制提醒。
+- 作者名稱顯示在預覽照片下方，點擊連回原貼文；三種匯出都保留來源。
 - 匯出含原圖的 XLSX，或下載 CSV、PNG。XLSX 保留裝備原名、取得方式、染色、疑似匹配與穿搭提醒，圖片放在 F 欄等比例縮放。
 - 對部分未匹配、低信心或小字區域自動裁切放大重讀，維持原有名稱匹配門檻。雙語名稱與染劑可依位置合併；兩個明確色槽使用相同染劑時保留兩槽。
 
@@ -25,7 +27,7 @@
 
 ## 使用方式
 
-1. 開啟線上版，貼上、拖入或選擇圖片。
+1. 開啟線上版，貼上 X 貼文網址並按「讀取整篇圖片」，或直接貼上、拖入、選擇圖片。
 2. 預設使用免費 PaddleOCR，不需 API Key。首次辨識會從本站載入引擎與模型，無需手動下載或安裝，請保持網路連線。
 3. 查看結果，核對疑似匹配與染色，再使用搜尋連結或匯出結果。
 
@@ -56,9 +58,13 @@ XLSX 檔名為 `YYYYMMDD標題_HHmmss.xlsx`；沒有可用標題時使用身體�
 - **線上版**：資料保存在目前瀏覽器，關閉頁面後仍會保留；清除網站資料或更換瀏覽器後需重新載入。
 - **下載版**：資料也保存在目前瀏覽器。若要同步寫回資料夾中的 JSON，請使用支援資料夾寫入的瀏覽器（如 Chrome、Edge），首次同步時選擇完整包的資料夾並授權，即可自動寫回 ff14_database.json。瀏覽器資料依網址與連接埠分開保存；啟動埠變更時會重新載入包內 JSON。
 
+網址取圖使用 [FxEmbed 公開服務](https://docs.fxembed.com/api/introduction/)，需要網路；私人、刪除貼文或服務異常時可能無法取得圖片。網址模式固定使用本機 OCR，不會呼叫付費 AI API。多圖無結果時保留原成果，下載失敗及引擎故障仍會提示。CSV 與 XLSX 共用日期、名稱、時間命名規則；CSV 的作者和網址使用兩個欄位，PNG 在原圖下方顯示來源。
+
 ## 隱私
 
 PaddleOCR 在使用者瀏覽器內處理圖片，不將圖片傳送至 OCR 服務。引擎與模型由本專案 GitHub Pages 載入，資料同步會連線至各公開來源庫。模型原始來源與 SHA-256 可在 [模型清單](ocr/models/manifest.json) 查看。
+
+使用 X 貼文網址時，瀏覽器會向 FxEmbed 查詢貼文 ID，再向 X 圖片服務下載圖片；這些服務可取得連線 IP 等一般請求資訊。圖片 OCR 仍在本機執行。
 
 API Key 儲存在本機瀏覽器。使用 AI API 時，圖片與驗證所需的 API Key 會直接傳送至所選服務商或自訂端點，本專案沒有代收圖片與金鑰的後端服務。
 

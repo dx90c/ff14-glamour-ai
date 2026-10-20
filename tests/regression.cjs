@@ -8,7 +8,7 @@ const elements = new Map();
 function element() {
   return {style:{},classList:{add(){},remove(){},contains(){return false},toggle(){}},
     addEventListener(){},setAttribute(){},removeAttribute(){},children:[],appendChild(child){this.children.push(child)},
-    querySelectorAll(){return []},scrollIntoView(){},innerText:'',innerHTML:'',value:'chs',isConnected:true};
+    replaceChildren(){this.children=[]},querySelectorAll(){return []},scrollIntoView(){},innerText:'',innerHTML:'',value:'chs',isConnected:true};
 }
 const context = vm.createContext({console,URLSearchParams,AbortSignal,Map,Set,Blob,structuredClone,atob,TextDecoder,Uint8Array,
   setTimeout,clearTimeout,localStorage:{getItem(){return null}},
