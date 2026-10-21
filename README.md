@@ -2,7 +2,7 @@
 
 讀取**附有裝備名稱文字**的 FF14 穿搭圖片，將名稱比對至裝備資料庫，整理取得方式與圖片中的染色資訊，方便查找與保存。
 
-[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/ff14_database_v2.6.0.json)
+[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/ff14_database_v2.6.1.json)
 
 ## 功能與限制
 
@@ -24,6 +24,8 @@
 「疑似匹配」表示系統依字形或錯字差異推測候選，請核對名稱；「未辨識染色」不代表沒有染色。染色與裝備的配對也可能出錯。模型信心分數不等於結果正確率。
 
 取得方式與限制資料並非全部收錄，且可能因伺服器或版本而不同。沒有出現穿搭提醒，不代表整套裝備沒有使用限制。
+
+左右雙欄的裝備說明在條件足夠時會分成兩套，染色與限制提醒各自配對；可用成果按鈕切換，預覽框標示對應的一側，匯出保留完整原圖。不符合分組條件時沿用原分類。目前僅驗證一張真實雙欄案例，交錯或模糊文字不保證能分組。
 
 ## 使用方式
 

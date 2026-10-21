@@ -34,7 +34,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 V2.6.0</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 V2.6.1</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -800,7 +800,7 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">V2.6.0</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">V2.6.1</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
@@ -827,7 +827,7 @@
     </div>
   </div>
 
-  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/FF14-Glamour-v2.6.0.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.0/ff14_database_v2.6.0.json" download>下載裝備庫 JSON</a></p>
+  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/ff14_database_v2.6.1.json" download>下載裝備庫 JSON</a></p>
   <section class="import-card" aria-label="加入穿搭圖片">
   <form class="post-import" onsubmit="event.preventDefault();recognizePost()">
     <label for="postUrl" style="font-weight:bold">貼上 X 貼文網址</label>
@@ -902,7 +902,7 @@
 
       <!-- Right: Image Preview -->
       <div class="image-preview-column" style="min-width:0">
-        <div class="image-preview-card"><img id="previewImg" src="" alt="預覽圖"></div>
+        <div class="image-preview-card"><div style="position:relative;display:inline-block;max-width:100%;vertical-align:top"><img id="previewImg" src="" alt="預覽圖"><div id="groupPreviewRegion" hidden style="position:absolute;top:0;bottom:0;border:2px solid #287ab0;box-sizing:border-box;pointer-events:none"><span style="position:absolute;top:5px;left:5px;padding:3px 7px;border-radius:4px;background:#287ab0;color:white;font-size:12px;white-space:nowrap"></span></div></div></div>
         <p id="postSource" style="margin:12px 8px 0;text-align:center;overflow-wrap:anywhere" hidden></p>
       </div>
     </div>
@@ -1037,12 +1037,12 @@
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.6.0 版本設定
+  // 全域狀態與 v2.6.1 版本設定
   const BUILTIN_VERSION = {
-    version: "V2.6.0",
-    sha: "builtin-v2.6.0",
+    version: "V2.6.1",
+    sha: "builtin-v2.6.1",
     date: "2026-10-21",
-    label: "V2.6.0"
+    label: "V2.6.1"
   };
 
   // 1. 初始化
@@ -1855,7 +1855,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.6.0 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.6.1 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -1989,7 +1989,7 @@ async function callLocalOCR(file, options = {}) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.0 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.1 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
     let result=await recognize(file),language='default';
@@ -2003,10 +2003,16 @@ async function callLocalOCR(file, options = {}) {
     }
     const reread=input=>recognize(input,{language});
     const refined=await refineOCRLines(file,result.items,slots,reread);
-    const data=assembleOCRItems(refined,slots);
-    data.note=equipmentRestrictionNote(data.items,restrictions.items);
+    const data=assembleOutfitLayouts(refined,slots,result.image?.width);
+    for(const outfit of data.outfits || [data])outfit.note=equipmentRestrictionNote(outfit.items,restrictions.items);
+    if(data.outfits)data.note=data.outfits[0].note;
     if(!data.items.length){if(options.quiet)return null;throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');}
-    if(!options.quiet){renderResult(data);currentOutfitData=data;}
+    if(!options.quiet){
+      if(data.outfits){
+        const photo={number:1,file,dataUrl:document.getElementById('previewImg').src};
+        postResults=data.outfits.map(outfit=>({data:outfit,photo}));postPhotos=[photo];renderPostChoices();showPostResult(0);
+      }else{renderResult(data);currentOutfitData=data;}
+    }
     appendStatusLog('完成',`辨識 ${result.items.length} 行，裝備 ${data.items.length} 件；信心分數不等於正確率`,'info');
     return data;
   } finally {loading.style.display='none';}
@@ -2773,10 +2779,13 @@ function assembleOCRItems(lines,slots) {
       if (!item || typeof item !== 'object') throw new Error('AI 裝備資料格式錯誤');
       return Object.fromEntries(['slot','name_zh','name_huiji','name_en_jp','source','dye','dye_setting'].map(k => [k, typeof item[k] === 'string' ? item[k] : '']));
     });
+    const marker=document.getElementById('groupPreviewRegion'),region=data.group_region;
+    marker.hidden=!(region && Number.isFinite(region.min) && Number.isFinite(region.max) && region.min>=0 && region.max<=1 && region.max>region.min);
+    if(!marker.hidden){marker.style.left=(region.min*100)+'%';marker.style.width=((region.max-region.min)*100)+'%';marker.firstElementChild.textContent=data.group_label || '';}
     const sourceElement=document.getElementById('postSource');sourceElement.replaceChildren();
     sourceElement.hidden=!data.source_url;
     if(data.source_url){const post=parsePostUrl(data.source_url);const a=document.createElement('a');a.href=post.url;a.textContent=data.source_author || '@'+post.handle;a.style.fontWeight='600';a.target='_blank';a.rel='noopener noreferrer';sourceElement.append('圖片來源：',a);}
-    if(!data.source_url){postResults=[];postPhotos=[];document.getElementById('postChoices').replaceChildren();}
+    if(!data.source_url && !data.group_label){postResults=[];postPhotos=[];document.getElementById('postChoices').replaceChildren();}
     document.getElementById("outfitTitle").innerText = data.outfit_title || "【套裝】外觀穿搭";
 
     const tbody = document.getElementById("itemsTableBody");
@@ -3072,7 +3081,7 @@ async function downloadPNG(button) {
     ctx.fillStyle = '#203449'; ctx.fillRect(0,0,1320,headerHeight);
     ctx.textBaseline = 'top'; ctx.font = 'bold 26px '+font; ctx.fillStyle = '#ffffff';
     titleLines.forEach((line,i)=>ctx.fillText(line,28,22+i*34));
-    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · V2.6.0',28,headerHeight-32);
+    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · V2.6.1',28,headerHeight-32);
     ctx.fillStyle = '#dfe8f0'; ctx.fillRect(left,tableTop,900,44);ctx.font=bold;ctx.fillStyle='#203449';
     let x=left;['部位','繁中裝備名稱／原名','取得方式','染色設定'].forEach((name,i)=>{ctx.fillText(name,x+12,tableTop+12);x+=widths[i];});
     let y=tableTop+44;
@@ -3176,7 +3185,7 @@ function renderPostChoices() {
   const choices = document.getElementById('postChoices'); choices.replaceChildren();
   if (postResults.length > 1) postResults.forEach((result,index)=>{
     const button = document.createElement('button');button.className='btn btn-secondary';
-    button.textContent=`成果 ${index+1}（${result.data.items.length} 件）`;button.onclick=()=>showPostResult(index);choices.append(button);
+    button.textContent=`${result.data.group_label ? (postPhotos.length>1?"圖片 "+result.photo.number+" · ":"")+result.data.group_label : "成果 "+(index+1)}（${result.data.items.length} 件）`;button.onclick=()=>showPostResult(index);choices.append(button);
   });
   if (postPhotos.length > 1) {
     const gallery=document.createElement('div');gallery.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:12px';
@@ -3211,12 +3220,12 @@ async function recognizePost() {
       let data;
       try{data=await callLocalOCR(file,{quiet:true});}catch(error){errors.push('OCR 未完成：'+error.message);break;}
       if(!data){skipped++;continue;}
-      data.source_url=post.url;data.source_author=authorName;results.push({data,photo});
+      for(const outfit of data.outfits || [data]){outfit.source_url=post.url;outfit.source_author=authorName;results.push({data:outfit,photo});}
     }
     if(results.length){
       postResults=results;postPhotos=photos;renderPostChoices();
       showPostResult(results.reduce((best,r,i)=>r.data.items.length>results[best].data.items.length?i:best,0));
-      status.textContent=`完成：${results.length} 張產生成果${skipped?`，${skipped} 張未匹配到裝備已略過`:''}。${errors.length?'部分圖片未完成：'+errors.join('；'):''}`;
+      status.textContent=`完成：${new Set(results.map(result=>result.photo)).size} 張圖片、${results.length} 組成果${skipped?`，${skipped} 張未匹配到裝備已略過`:''}。${errors.length?'部分圖片未完成：'+errors.join('；'):''}`;
     }else{
       if(previous.data){currentOutfitData=previous.data;currentImageBase64=previous.base64;currentImageMime=previous.mime;document.getElementById('previewImg').src=previous.src;renderResult(previous.data);}
       status.textContent=errors.length?errors.join('；'):'整篇未找到可辨識的裝備名稱，請改貼清楚的圖片。';
@@ -3227,6 +3236,42 @@ async function recognizePost() {
   } finally { imageRequestBusy=false;button.disabled=false; }
 }
 // === [SECTION: JS_POST_IMAGES] END ===
+
+// === [SECTION: JS_OUTFIT_LAYOUTS] START ===
+function detectOutfitColumns(lines,slots,imageWidth) {
+  if(!(imageWidth>0))return null;
+  const anchors=lines.map(line=>({line,match:ocrGear(line,slots),box:ocrBox(line)})).filter(a=>a.match);
+  anchors.sort((a,b)=>(a.box.x+a.box.w/2)-(b.box.x+b.box.w/2));
+  let gap=0,boundary=0;
+  for(let i=1;i<anchors.length;i++){
+    const left=anchors[i-1].box.x+anchors[i-1].box.w/2,right=anchors[i].box.x+anchors[i].box.w/2;
+    if(right-left>gap){gap=right-left;boundary=(left+right)/2;}
+  }
+  if(gap<imageWidth*.24||boundary<imageWidth*.3||boundary>imageWidth*.7)return null;
+  const sides=[anchors.filter(a=>a.box.x+a.box.w<=boundary),anchors.filter(a=>a.box.x>=boundary)];
+  const coreSlots=new Set([3,4,5,7,8]);
+  const ids=sides.map(side=>new Set(side.map(a=>a.match.id)));
+  const parts=sides.map(side=>new Set(side.map(a=>Number(slots[a.match.id])).filter(slot=>coreSlots.has(slot))));
+  // Require two distinct equipment lists, not two language labels for the same outfit.
+  if(sides.some((side,i)=>ids[i].size<3||parts[i].size<3||!parts[i].has(4)))return null;
+  if([...parts[0]].filter(slot=>parts[1].has(slot)).length<2)return null;
+  if(![...ids[0]].some(id=>!ids[1].has(id))||![...ids[1]].some(id=>!ids[0].has(id)))return null;
+  return [{label:'左側穿搭',min:0,max:boundary/imageWidth},{label:'右側穿搭',min:boundary/imageWidth,max:1}];
+}
+function assembleOutfitLayouts(lines,slots,imageWidth) {
+  const columns=detectOutfitColumns(lines,slots,imageWidth);
+  if(!columns)return assembleOCRItems(lines,slots);
+  const outfits=columns.map(column=>{
+    // Exclude boundary-crossing labels; no dye or name can participate in both groups.
+    const local=lines.filter(line=>{const b=ocrBox(line);return b.x>=column.min*imageWidth&&b.x+b.w<=column.max*imageWidth;});
+    const data=assembleOCRItems(local,slots);
+    const body=data.items.find(item=>item.slot==='身體');
+    const name=body&&(matchEquipment(body)?.names.tc||body.name_zh);
+    return {...data,group_label:column.label,outfit_title:column.label+(name?' · '+name:''),group_region:{min:column.min,max:column.max}};
+  });
+  return {...outfits[0],outfits};
+}
+// === [SECTION: JS_OUTFIT_LAYOUTS] END ===
 
 </script>
 
