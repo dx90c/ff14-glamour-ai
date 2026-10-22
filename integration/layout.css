@@ -1,0 +1,25 @@
+#batchPanel{margin:16px 0;padding:14px 16px;background:#f6f8fb;border:1px solid #e0e6ec;border-radius:10px}
+#batchStatus{font-size:.9rem;line-height:1.7}
+#batchStop{margin-left:10px}
+#batchStop:disabled{display:none}
+#batchResults{display:grid;gap:8px;margin-top:10px}
+#batchResults .review-row{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,2fr);gap:12px;align-items:center;padding-top:8px;border-top:1px solid #e1e7ee}
+.batch-source{color:#526a80;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.batch-row-actions{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.batch-row-actions .btn{font-size:.8rem;padding:7px 10px;text-align:left;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#batchExportBar{margin:14px 0}
+.outfit-switch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr));gap:10px}
+.outfit-switch-card{display:flex;align-items:center;gap:12px;min-width:0;min-height:92px;padding:10px 12px;border:1px solid #dce3ea;border-radius:10px;background:#f6f8fa;color:#293f53;text-align:left;font:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+.outfit-switch-card:hover{background:#edf4fa;border-color:#8db6d4}
+.outfit-switch-card[aria-pressed=true]{border-color:#2980b9;background:#eaf4fc;box-shadow:inset 3px 0 #2980b9}
+.outfit-switch-card:focus-visible,.photo-choice-gallery button:focus-visible{outline:3px solid #65a8d5;outline-offset:2px}
+.outfit-switch-card img{width:48px;height:66px;object-fit:contain;flex-shrink:0;background:#e8edf2;border-radius:5px}
+.outfit-switch-text{min-width:0;display:grid;gap:6px}
+.outfit-switch-text strong{font-size:.88rem;line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.outfit-switch-text small{font-size:.75rem;color:#64798a;line-height:1.4;overflow-wrap:anywhere}
+.photo-choice-label{margin:16px 0 8px;color:#64798a;font-size:.8rem}
+.photo-choice-gallery{display:flex;gap:8px;flex-wrap:wrap}
+.photo-choice-gallery button{padding:5px;border:1px solid #dce3ea;border-radius:8px;background:#f6f8fa;cursor:pointer}
+.photo-choice-gallery button[aria-pressed=true]{border-color:#2980b9;background:#eaf4fc}
+.photo-choice-gallery img{display:block;width:54px;height:72px;object-fit:contain}
+@media(max-width:600px){#batchResults .review-row{grid-template-columns:minmax(0,1fr);gap:6px}.action-buttons{gap:6px;flex-wrap:wrap}.outfit-switch-grid{grid-template-columns:minmax(0,1fr)}}

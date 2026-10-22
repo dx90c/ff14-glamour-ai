@@ -31,26 +31,28 @@ async function callLocalOCR(file, options = {}) {
     if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.1 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
-    let result=await recognize(file),language='default';
+    const scan=(input,opts={})=>options.scanScale?scanOCRRegions(input,options.scanScale,{...opts,region:options.region}):recognize(input,opts);
+    let result=await scan(file),language='default';
     if(result.items.filter(line=>ocrGear(line,slots)).length<3){
       appendStatusLog('辨識中','補讀韓文名稱','info');
       try {
-        const korean=await recognize(file,{language:'ko'});
+        const korean=await scan(file,{language:'ko'});
         const score=r=>new Set(r.items.map(line=>ocrGear(line,slots)?.id).filter(Boolean)).size;
         if(score(korean)>score(result)){result=korean;language='ko';}
       } catch(error) { console.warn('韓文補讀未完成，保留原結果',error); }
     }
     const reread=input=>recognize(input,{language});
-    const refined=await refineOCRLines(file,result.items,slots,reread);
+    let refined=await refineOCRLines(file,result.items,slots,reread);
+    if(options.region)refined=refined.filter(l=>{const b=ocrBox(l),w=result.image?.width;return w&&b.x>=options.region.min*w&&b.x+b.w<=options.region.max*w;});
+    refined=inferTruncatedLayouts(refined,result.image?.width||0,slots,options.region);
     const data=assembleOutfitLayouts(refined,slots,result.image?.width);
     for(const outfit of data.outfits || [data])outfit.note=equipmentRestrictionNote(outfit.items,restrictions.items);
     if(data.outfits)data.note=data.outfits[0].note;
     if(!data.items.length){if(options.quiet)return null;throw new Error('未匹配到裝備名稱。請使用名稱文字清楚的原始截圖，或切換 AI 模式');}
     if(!options.quiet){
-      if(data.outfits){
-        const photo={number:1,file,dataUrl:document.getElementById('previewImg').src};
-        postResults=data.outfits.map(outfit=>({data:outfit,photo}));postPhotos=[photo];renderPostChoices();showPostResult(0);
-      }else{renderResult(data);currentOutfitData=data;}
+      const photo={number:1,file,dataUrl:document.getElementById('previewImg').src};
+      postPhotos=[photo];postResults=(data.outfits||[data]).map(outfit=>({data:outfit,photo,scanPhoto:photo,photos:[photo]}));
+      explorationBatchRows=postResults;document.getElementById('batchPanel').hidden=true;document.getElementById('batchExportBar').hidden=postResults.length<2;showPostResult(0);
     }
     appendStatusLog('完成',`辨識 ${result.items.length} 行，裝備 ${data.items.length} 件；信心分數不等於正確率`,'info');
     return data;
@@ -160,7 +162,7 @@ function assembleOCRItems(lines,slots) {
     let dye;
     if(channels.size)dye=[1,2].filter(n=>channels.has(n)).map(n=>`${n===1?'①':'②'} ${channels.get(n)}`).join(' / ');
     else dye=[...new Set(plain.map(d=>d.name))].join(' / ')||'未辨識染色（OCR）';
-    return {slot:slotNames[slots[group.match.id]],name_zh:group.line.text,name_en_jp:'',name_huiji:'',source:'',dye};
+    return {slot:slotNames[slots[group.match.id]],...group.line.truncatedItem,name_zh:group.line.text,name_en_jp:'',name_huiji:'',source:'',dye};
   });
   items.sort((a,b)=>Object.values(slotNames).indexOf(a.slot)-Object.values(slotNames).indexOf(b.slot));
   return {outfit_title:'免費 OCR 外觀辨識',note:'',items};

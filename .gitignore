@@ -23,3 +23,4 @@ Desktop.ini
 .DS_Store
 ocr-src/node_modules/
 ocr-src/release-ocr/
+tests/results/
