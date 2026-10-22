@@ -2,7 +2,7 @@
 
 讀取**附有裝備名稱文字**的 FF14 穿搭圖片，將名稱比對至裝備資料庫，整理取得方式與圖片中的染色資訊，方便查找與保存。
 
-[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/ff14_database_v2.6.1.json)
+[線上使用](https://dx90c.github.io/ff14-glamour-ai/) · [下載完整檔案](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.2/FF14-Glamour-v2.6.2.zip) · [下載 HTML](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.2/FF14-Glamour-v2.6.2.html) · [下載裝備庫 JSON](https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.2/ff14_database_v2.6.2.json)
 
 ## 功能與限制
 
@@ -27,9 +27,17 @@
 
 左右雙欄的裝備說明在條件足夠時會分成兩套，染色與限制提醒各自配對；可用成果按鈕切換，預覽框標示對應的一側，匯出保留完整原圖。不符合分組條件時沿用原分類。目前僅驗證一張真實雙欄案例，交錯或模糊文字不保證能分組。
 
+### 批次辨識與重掃
+
+- 每次最多 20 篇 X 貼文，依貼文 ID 去重，依序處理；第一套完成即顯示，後續逐步追加。可在處理中切換已完成成果，或按「完成本篇後停止」。
+- 縮圖卡片切換目前穿搭；同篇其他照片可作為該套的預覽與匯出用圖。單套 XLSX、CSV、PNG 保留原有用途；「匯出全部 XLSX」會把全部成果放進一本，每套含圖一頁，另附目錄。
+- 小字或漏件可嘗試 3／4 倍分區重掃；左右分組只重掃目前這一側。失敗或件數減少時保留原結果，不會補回原圖已截掉的文字。
+- 符合規則的截斷日文名稱可搭配部位推測，結果仍標示疑似，請人工核對。
+- 貼文結果快取於目前瀏覽器的 IndexedDB，有效期 24 小時，最多 20 篇／100 MB；資料版本或辨識規則改變即失效。按「重新辨識」可略過快取。快取可能包含圖片及作者來源，清除網站資料即可移除；本功能不會把成果上傳到本專案伺服器。
+
 ## 使用方式
 
-1. 開啟線上版，貼上 X 貼文網址並按「讀取整篇圖片」，或直接貼上、拖入、選擇圖片。
+1. 開啟線上版，貼上 X 貼文網址即辨識，多篇網址請分行，或按「讀取貼文」，或直接貼上、拖入、選擇圖片。
 2. 預設使用免費 PaddleOCR，不需 API Key。首次辨識會從本站載入引擎與模型，無需手動下載或安裝，請保持網路連線。
 3. 查看結果，核對疑似匹配與染色，再使用搜尋連結或匯出結果。
 

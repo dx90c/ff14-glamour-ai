@@ -34,7 +34,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF14 幻化外觀 AI 辨識小工具 V2.6.1 整合測試</title>
+  <title>FF14 幻化外觀 AI 辨識小工具 V2.6.2</title>
   <style>
     /* === [SECTION: CSS_STYLES] START === */
     :root {
@@ -827,7 +827,7 @@
   <header>
     <div class="header-top">
       <div class="header-title">
-        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">V2.6.1 整合測試</span></h1>
+        <h1>👗 FF14 幻化外觀 AI 辨識小工具 <span class="v2-badge">V2.6.2</span></h1>
       </div>
       <div class="header-actions">
         <button class="header-btn" id="dbBtn" onclick="openDbModal()">
@@ -854,7 +854,7 @@
     </div>
   </div>
 
-  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/FF14-Glamour-v2.6.1.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.1/ff14_database_v2.6.1.json" download>下載裝備庫 JSON</a></p>
+  <p style="font-size:0.85rem"><a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.2/FF14-Glamour-v2.6.2.zip">下載完整檔案</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.2/FF14-Glamour-v2.6.2.html" download>下載 HTML</a> · <a href="https://github.com/dx90c/ff14-glamour-ai/releases/download/v2.6.2/ff14_database_v2.6.2.json" download>下載裝備庫 JSON</a></p>
   <section class="import-card" aria-label="加入穿搭圖片">
   <form class="post-import" onsubmit="event.preventDefault();submitPostUrls()">
     <label for="postUrl" style="font-weight:bold">貼上 X 貼文網址</label>
@@ -1067,12 +1067,12 @@
   let currentImageMime = "image/jpeg";
 
   // === [SECTION: JS_GLOBAL_STATE] START ===
-  // 全域狀態與 v2.6.1 版本設定
+  // 全域狀態與 v2.6.2 版本設定
   const BUILTIN_VERSION = {
-    version: "V2.6.1 整合測試",
-    sha: "builtin-v2.6.1",
+    version: "V2.6.2",
+    sha: "builtin-v2.6.2",
     date: "2026-10-21",
-    label: "V2.6.1 整合測試"
+    label: "V2.6.2"
   };
 
   // 1. 初始化
@@ -1885,7 +1885,7 @@
 
   async function resetToDefaultDb() {
     if (databaseSyncBusy) { showToast("同步進行中，請稍後清除"); return; }
-    if (!confirm('清除 v2.6.1 資料庫快取？之後需重新同步或匯入 JSON。')) return;
+    if (!confirm('清除 v2.6.2 資料庫快取？之後需重新同步或匯入 JSON。')) return;
     try {
       const db = await openItemDatabase();
       try {
@@ -2020,7 +2020,7 @@ async function callLocalOCR(file, options = {}) {
       const response=await fetch(new URL('./ff14_database.json',location.href));
       if(response.ok){const bundled=await response.json();if(bundled.ocrSupport){db.ocrSupport=bundled.ocrSupport;await saveDatabaseToIDB(db);}}
     }
-    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.1 裝備庫以取得部位與限制索引');
+    if(!db.ocrSupport?.slots)throw new Error('請匯入 v2.6.2 裝備庫以取得部位與限制索引');
     const slots=db.ocrSupport.slots;
     const restrictions={items:db.ocrSupport.restrictions};
     const scan=(input,opts={})=>options.scanScale?scanOCRRegions(input,options.scanScale,{...opts,region:options.region}):recognize(input,opts);
@@ -3114,7 +3114,7 @@ async function downloadPNG(button) {
     ctx.fillStyle = '#203449'; ctx.fillRect(0,0,1320,headerHeight);
     ctx.textBaseline = 'top'; ctx.font = 'bold 26px '+font; ctx.fillStyle = '#ffffff';
     titleLines.forEach((line,i)=>ctx.fillText(line,28,22+i*34));
-    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · V2.6.1 整合測試',28,headerHeight-32);
+    ctx.font = regular; ctx.fillStyle = '#c9d9e8';ctx.fillText('FF14 外觀筆記 · V2.6.2',28,headerHeight-32);
     ctx.fillStyle = '#dfe8f0'; ctx.fillRect(left,tableTop,900,44);ctx.font=bold;ctx.fillStyle='#203449';
     let x=left;['部位','繁中裝備名稱／原名','取得方式','染色設定'].forEach((name,i)=>{ctx.fillText(name,x+12,tableTop+12);x+=widths[i];});
     let y=tableTop+44;
@@ -3272,7 +3272,7 @@ async function recognizePost() {
 let explorationBatchBusy=false,explorationBatchStop=false,explorationBatchRows=[];
 const explorationPrefs={retry:true,retryScale:3};
 async function explorationStore(mode,run){
- const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('FF14_POST_RESULTS_INTEGRATION_1',1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+ const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('FF14_POST_RESULTS_V262',1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
  try{return await new Promise((resolve,reject)=>{const tx=db.transaction('data',mode);let result;tx.oncomplete=()=>resolve(result instanceof IDBRequest?result.result:result);tx.onabort=tx.onerror=()=>reject(tx.error||new Error('本機儲存失敗'));try{result=run(tx.objectStore('data'));}catch(e){tx.abort();reject(e);}});}finally{db.close();}
 }
 function resultData(data){
@@ -3301,7 +3301,7 @@ function mergePostOutfits(results){
     candidate.data.note=[...new Set([candidate.data.note,result.data.note].filter(Boolean))].join(' ');
   }return merged;
 }
-function explorationCacheSignature(){return JSON.stringify(['main261-integration-v1',explorationPrefs.retry,explorationPrefs.retryScale,getCustomDatabase()?.updatedAt,getCustomDatabase()?.version,getCustomDatabase()?.provenance?.map(p=>[p.repo,p.commit])]);}
+function explorationCacheSignature(){return JSON.stringify(['v262-results-v1',explorationPrefs.retry,explorationPrefs.retryScale,getCustomDatabase()?.updatedAt,getCustomDatabase()?.version,getCustomDatabase()?.provenance?.map(p=>[p.repo,p.commit])]);}
 async function savePostCache(post){
   const row={id:post.id,savedAt:Date.now(),signature:explorationCacheSignature(),photos:postPhotos.map(p=>({number:p.number,file:p.file})),results:postResults.filter(r=>parsePostUrl(r.data.source_url).id===post.id).map(r=>({data:resultData(r.data),photo:r.photo.number}))};
   // shortcut: keep only 20 cached posts; exports are the durable user-controlled copy.
